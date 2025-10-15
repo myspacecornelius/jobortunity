@@ -222,7 +222,7 @@ const JobSearchAutomation: React.FC = () => {
   const remoteTasks = normalizeTasks(remoteMatches);
 
   const jobs = isRemote && remoteJobs.length ? remoteJobs : localJobs;
-  const tasks: JobTask[] = isRemote && remoteTasks.length ? remoteTasks : localTasks;
+  const tasks: JobTaskWithLead[] = isRemote && remoteTasks.length ? remoteTasks : (localTasks as JobTaskWithLead[]);
 
   const filteredJobs = useMemo(() => {
     const filtered = jobs.filter((job) => {

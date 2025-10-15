@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { Configuration, OpenAIApi } from 'openai';
+import OpenAI from 'openai';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -16,8 +16,18 @@ if (!env.success) {
   process.exit(1);
 }
 
-const configuration = new Configuration({ apiKey: env.data.OPENAI_API_KEY });
-const openai = new OpenAIApi(configuration);
+const openai = new OpenAI({ apiKey: env.data.OPENAI_API_KEY });
+
+async function generateJsonResponse(prompt: string, model = 'gpt-4o-mini') {
+  const response = await openai.responses.create({
+    model,
+    input: prompt,
+    response_format: { type: 'json_object' },
+  });
+
+  const output = response.output_text;
+  return JSON.parse(output);
+}
 
 const app = express();
 app.use(cors());
@@ -30,19 +40,12 @@ app.post('/api/fit-score', async (req, res) => {
       resumeHighlights: string;
     };
 
-    const prompt = `You are a career agent. Given a job description and candidate highlights, respond in JSON with fields: fit_score (0-100) and recommendations (array of 3 bullet strings).\nJob Description: ${jobDescription}\nCandidate Highlights: ${resumeHighlights}`;
+    const prompt = `You are an executive career copilot. Compare the job description and candidate highlights below and respond with JSON containing: fit_score (0-100), summary (string), top_skills (array of strings), gaps (array of strings), risks (array of strings), recommended_actions (array of strings).
+Job description: ${jobDescription}
+Candidate highlights: ${resumeHighlights}`;
 
-    const completion = await openai.createChatCompletion({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You output valid JSON only.' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.4,
-    });
-
-    const message = completion.data.choices[0]?.message?.content ?? '{}';
-    res.json(JSON.parse(message));
+    const json = await generateJsonResponse(prompt);
+    res.json(json);
   } catch (error) {
     console.error('[fit-score] error', error);
     res.status(500).json({ error: 'Failed to generate fit score' });
@@ -51,23 +54,60 @@ app.post('/api/fit-score', async (req, res) => {
 
 app.post('/api/outreach', async (req, res) => {
   try {
-    const { company, role, tone } = req.body as { company: string; role: string; tone?: string };
-    const prompt = `Write a concise outreach email for a candidate applying to ${company} for a ${role} position. Tone should be ${tone ?? 'warm, professional'}. Return JSON with subject and body fields.`;
+    const { company, role, tone, callToAction, persona } = req.body as {
+      company: string;
+      role: string;
+      tone?: string;
+      callToAction?: string;
+      persona?: string;
+    };
 
-    const completion = await openai.createChatCompletion({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You output valid JSON only.' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.7,
-    });
+    const prompt = `You help craft personalised outreach messages. Return JSON with fields: subject, preview, body. Tone: ${tone ?? 'warm, professional'}. Call to action: ${callToAction ?? 'request a short intro call'}. Persona/context: ${persona ?? 'product leader who cares about metrics and collaboration'}. Role: ${role} at ${company}. Body should be <= 170 words.`;
 
-    const message = completion.data.choices[0]?.message?.content ?? '{}';
-    res.json(JSON.parse(message));
+    const json = await generateJsonResponse(prompt, 'gpt-4o-mini');
+    res.json(json);
   } catch (error) {
     console.error('[outreach] error', error);
     res.status(500).json({ error: 'Failed to generate outreach' });
+  }
+});
+
+app.post('/api/resume-tailor', async (req, res) => {
+  try {
+    const { jobDescription, resume, focusAreas } = req.body as {
+      jobDescription: string;
+      resume: string;
+      focusAreas?: string;
+    };
+
+    const prompt = `You tailor resumes into impact bullets. Produce JSON with fields: summary (string), bullets (array of objects {headline, detail}), keywords (array of strings). Focus areas: ${focusAreas ?? 'product impact, metrics, leadership'}.
+Job description: ${jobDescription}
+Resume source: ${resume}`;
+
+    const json = await generateJsonResponse(prompt, 'gpt-4o-mini');
+    res.json(json);
+  } catch (error) {
+    console.error('[resume-tailor] error', error);
+    res.status(500).json({ error: 'Failed to tailor resume' });
+  }
+});
+
+app.post('/api/interview-prep', async (req, res) => {
+  try {
+    const { company, role, jobDescription, experienceHighlights } = req.body as {
+      company: string;
+      role: string;
+      jobDescription: string;
+      experienceHighlights?: string;
+    };
+
+    const prompt = `You create interview prep kits. Respond with JSON containing: warmups (array of strings), questions (array of strings), star_stories (array of objects {prompt, outline}). Company: ${company}. Role: ${role}. Job description: ${jobDescription}. Candidate highlights: ${experienceHighlights ?? 'seasoned operator with cross-functional leadership experience'}.`;
+
+    const json = await generateJsonResponse(prompt, 'gpt-4o-mini');
+    res.json(json);
+  } catch (error) {
+    console.error('[interview-prep] error', error);
+    res.status(500).json({ error: 'Failed to generate interview prep' });
   }
 });
 

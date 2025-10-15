@@ -1,12 +1,27 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { CheckCircle2, ExternalLink, GaugeCircle, Sparkles, TimerReset, Wand2, Workflow } from 'lucide-react';
+import {
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  GaugeCircle,
+  Lightbulb,
+  Sparkles,
+  TimerReset,
+  Wand2,
+  Workflow,
+} from 'lucide-react';
 
 import { stageOrder, type JobStage } from '../../constants/stages';
 import { cn } from '../../lib/cn';
 import type { JobLead, JobTask, TaskStatus } from '../../types/job';
 import Card, { CardContent } from '../common/Card';
-import { useFitScore, useOutreachGenerator } from '../../hooks/useFitScore';
+import {
+  useFitScore,
+  useInterviewPrep,
+  useOutreachGenerator,
+  useResumeTailor,
+} from '../../hooks/useFitScore';
 
 interface JobDetailPanelProps {
   job: JobLead;
@@ -23,10 +38,52 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   onScheduleFollowUp,
   onTaskStatusChange,
 }) => {
-  const [fitResult, setFitResult] = useState<{ score: number; recommendations: string[] } | null>(null);
-  const [outreachResult, setOutreachResult] = useState<{ subject: string; body: string } | null>(null);
+  const [fitResult, setFitResult] = useState<
+    | {
+        score: number;
+        summary: string;
+        top_skills: string[];
+        gaps: string[];
+        risks: string[];
+        recommended_actions: string[];
+      }
+    | null
+  >(null);
+  const [outreachResult, setOutreachResult] = useState<
+    | {
+        subject: string;
+        preview?: string;
+        body: string;
+      }
+    | null
+  >(null);
+  const [resumeResult, setResumeResult] = useState<
+    | {
+        summary: string;
+        keywords: string[];
+        bullets: Array<{ headline: string; detail: string }>;
+      }
+    | null
+  >(null);
+  const [interviewResult, setInterviewResult] = useState<
+    | {
+        warmups: string[];
+        questions: string[];
+        star_stories: Array<{ prompt: string; outline: string }>;
+      }
+    | null
+  >(null);
+
+  const [resumeInput, setResumeInput] = useState(job.notes.join('\n'));
+  const [focusAreas, setFocusAreas] = useState('Impact, metrics, leadership');
+  const [experienceInput, setExperienceInput] = useState(job.notes.join('\n'));
+  const [outreachTone, setOutreachTone] = useState('warm, professional');
+  const [outreachCTA, setOutreachCTA] = useState('book a 20-minute intro call');
+
   const fitMutation = useFitScore();
   const outreachMutation = useOutreachGenerator();
+  const resumeMutation = useResumeTailor();
+  const interviewMutation = useInterviewPrep();
 
   const renderStagePills = () => (
     <div className="flex flex-wrap gap-2">
@@ -60,9 +117,16 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
       const result = await fitMutation.mutateAsync({
         jobDescription:
           job.description ?? `${job.role} at ${job.company} located in ${job.location}. Priority ${job.priority}.`,
-        resumeHighlights: job.notes.join('\n') || 'Seasoned operator with track record of shipping outcomes.',
+        resumeHighlights: resumeInput || job.notes.join('\n') || 'Seasoned operator with track record of shipping outcomes.',
       });
-      setFitResult({ score: result.fit_score, recommendations: result.recommendations ?? [] });
+      setFitResult({
+        score: result.fit_score,
+        summary: result.summary,
+        top_skills: result.top_skills ?? [],
+        gaps: result.gaps ?? [],
+        risks: result.risks ?? [],
+        recommended_actions: result.recommended_actions ?? [],
+      });
     } catch (error) {
       console.error('[fit-score] failed', error);
     }
@@ -70,10 +134,42 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
 
   const handleOutreach = async () => {
     try {
-      const result = await outreachMutation.mutateAsync({ company: job.company, role: job.role });
+      const result = await outreachMutation.mutateAsync({
+        company: job.company,
+        role: job.role,
+        tone: outreachTone,
+        callToAction: outreachCTA,
+      });
       setOutreachResult(result);
     } catch (error) {
       console.error('[outreach] failed', error);
+    }
+  };
+
+  const handleResumeTailor = async () => {
+    try {
+      const result = await resumeMutation.mutateAsync({
+        jobDescription: job.description ?? job.role,
+        resume: resumeInput,
+        focusAreas,
+      });
+      setResumeResult(result);
+    } catch (error) {
+      console.error('[resume-tailor] failed', error);
+    }
+  };
+
+  const handleInterviewPrep = async () => {
+    try {
+      const result = await interviewMutation.mutateAsync({
+        company: job.company,
+        role: job.role,
+        jobDescription: job.description ?? job.role,
+        experienceHighlights: experienceInput,
+      });
+      setInterviewResult(result);
+    } catch (error) {
+      console.error('[interview-prep] failed', error);
     }
   };
 
@@ -105,7 +201,52 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
           </div>
         </div>
 
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                Resume Highlights
+              </label>
+              <textarea
+                value={resumeInput}
+                onChange={(event) => setResumeInput(event.target.value)}
+                className="h-24 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary/40"
+                placeholder="Paste resume bullets, metrics, and relevant achievements"
+              />
+              <input
+                value={focusAreas}
+                onChange={(event) => setFocusAreas(event.target.value)}
+                className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground focus:border-primary/40"
+                placeholder="Focus areas (e.g. growth, GTM, leadership)"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+                Interview Context
+              </label>
+              <textarea
+                value={experienceInput}
+                onChange={(event) => setExperienceInput(event.target.value)}
+                className="h-24 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary/40"
+                placeholder="Add experience notes, stories, or themes to emphasise"
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <input
+                  value={outreachTone}
+                  onChange={(event) => setOutreachTone(event.target.value)}
+                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground focus:border-primary/40"
+                  placeholder="Outreach tone"
+                />
+                <input
+                  value={outreachCTA}
+                  onChange={(event) => setOutreachCTA(event.target.value)}
+                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground focus:border-primary/40"
+                  placeholder="Call to action"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -124,6 +265,24 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
             >
               <Wand2 className="h-3.5 w-3.5" />
               {outreachMutation.isPending ? 'Generating…' : 'Draft outreach'}
+            </button>
+            <button
+              type="button"
+              onClick={handleResumeTailor}
+              disabled={resumeMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {resumeMutation.isPending ? 'Tailoring…' : 'Tailor resume'}
+            </button>
+            <button
+              type="button"
+              onClick={handleInterviewPrep}
+              disabled={interviewMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Lightbulb className="h-3.5 w-3.5" />
+              {interviewMutation.isPending ? 'Assembling…' : 'Interview prep'}
             </button>
           </div>
 
@@ -157,14 +316,40 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
           </div>
 
           {fitResult ? (
-            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+            <div className="space-y-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
               <div className="flex items-center justify-between text-primary">
                 <span className="font-semibold">AI Fit Score</span>
                 <span className="text-base font-semibold">{fitResult.score}%</span>
               </div>
+              <p className="text-primary/90">{fitResult.summary}</p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/70">Strengths</p>
+                  <ul className="space-y-1 text-primary/80">
+                    {fitResult.top_skills.map((item, index) => (
+                      <li key={`strength-${index}`} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/70">Gaps</p>
+                  <ul className="space-y-1 text-primary/80">
+                    {fitResult.gaps.map((item, index) => (
+                      <li key={`gap-${index}`} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/70">Next moves</p>
               <ul className="space-y-1 text-primary/80">
-                {fitResult.recommendations.map((item, index) => (
-                  <li key={`fit-${index}`} className="flex items-start gap-2">
+                {fitResult.recommended_actions.map((item, index) => (
+                  <li key={`fit-action-${index}`} className="flex items-start gap-2">
                     <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/80" />
                     <span>{item}</span>
                   </li>
@@ -178,8 +363,77 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
               <div className="text-secondary font-semibold">Suggested Outreach</div>
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary/80">Subject</p>
               <p className="text-secondary/90">{outreachResult.subject}</p>
+              {outreachResult.preview ? (
+                <>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary/80">Preview</p>
+                  <p className="text-secondary/90">{outreachResult.preview}</p>
+                </>
+              ) : null}
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary/80">Body</p>
               <p className="whitespace-pre-wrap text-secondary/90">{outreachResult.body}</p>
+            </div>
+          ) : null}
+
+          {resumeResult ? (
+            <div className="space-y-3 rounded-xl border border-border bg-surface/90 p-4 text-sm">
+              <div className="flex items-center justify-between text-foreground">
+                <span className="font-semibold">Tailored Resume Bullets</span>
+                {resumeResult.keywords.length ? (
+                  <span className="text-xs text-muted-foreground">
+                    Keywords: {resumeResult.keywords.join(', ')}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground">{resumeResult.summary}</p>
+              <ul className="space-y-2 text-muted-foreground">
+                {resumeResult.bullets.map((bullet, index) => (
+                  <li key={`resume-${index}`} className="rounded-xl border border-border bg-background p-3">
+                    <p className="font-semibold text-foreground">{bullet.headline}</p>
+                    <p>{bullet.detail}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {interviewResult ? (
+            <div className="space-y-3 rounded-xl border border-border bg-surface/90 p-4 text-sm">
+              <div className="font-semibold text-foreground">Interview Prep Kit</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Warmups</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    {interviewResult.warmups.map((item, index) => (
+                      <li key={`warmup-${index}`} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-pop" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Questions</p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    {interviewResult.questions.map((item, index) => (
+                      <li key={`question-${index}`} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-pop" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">STAR Stories</p>
+                <ul className="space-y-2 text-muted-foreground">
+                  {interviewResult.star_stories.map((story, index) => (
+                    <li key={`story-${index}`} className="rounded-xl border border-border bg-background p-3">
+                      <p className="font-semibold text-foreground">{story.prompt}</p>
+                      <p>{story.outline}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           ) : null}
 
