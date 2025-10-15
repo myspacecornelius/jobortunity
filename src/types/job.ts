@@ -19,6 +19,7 @@ export interface JobLead {
   automationScore: number;
   tags: string[];
   notes: string[];
+  description?: string;
 }
 
 export interface JobTask {

@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { CheckCircle2, ExternalLink, Sparkles, TimerReset, Workflow } from 'lucide-react';
+import { CheckCircle2, ExternalLink, GaugeCircle, Sparkles, TimerReset, Wand2, Workflow } from 'lucide-react';
 
 import { stageOrder, type JobStage } from '../../constants/stages';
 import { cn } from '../../lib/cn';
 import type { JobLead, JobTask, TaskStatus } from '../../types/job';
 import Card, { CardContent } from '../common/Card';
+import { useFitScore, useOutreachGenerator } from '../../hooks/useFitScore';
 
 interface JobDetailPanelProps {
   job: JobLead;
@@ -21,33 +23,58 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   onScheduleFollowUp,
   onTaskStatusChange,
 }) => {
-  const renderStagePills = () => {
-    return (
-      <div className="flex flex-wrap gap-2">
-        {stageOrder.map((stage) => {
-          const isActive = stage === job.stage;
-          const stageIndex = stageOrder.indexOf(stage);
-          const currentIndex = stageOrder.indexOf(job.stage);
-          const isCompleted = stageIndex < currentIndex;
+  const [fitResult, setFitResult] = useState<{ score: number; recommendations: string[] } | null>(null);
+  const [outreachResult, setOutreachResult] = useState<{ subject: string; body: string } | null>(null);
+  const fitMutation = useFitScore();
+  const outreachMutation = useOutreachGenerator();
 
-          return (
-            <button
-              key={`${job.id}-${stage}`}
-              onClick={() => onStageChange(job.id, stage)}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition hover:shadow-sm',
-                isActive && 'border-primary bg-primary/10 text-primary font-medium',
-                !isActive && !isCompleted && 'border-muted text-muted-foreground',
-                isCompleted && 'border-emerald-200 bg-emerald-50 text-emerald-700',
-              )}
-            >
-              {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Workflow className="h-3.5 w-3.5" />}
-              {stage}
-            </button>
-          );
-        })}
-      </div>
-    );
+  const renderStagePills = () => (
+    <div className="flex flex-wrap gap-2">
+      {stageOrder.map((stage) => {
+        const isActive = stage === job.stage;
+        const stageIndex = stageOrder.indexOf(stage);
+        const currentIndex = stageOrder.indexOf(job.stage);
+        const isCompleted = stageIndex < currentIndex;
+
+        return (
+          <button
+            key={`${job.id}-${stage}`}
+            onClick={() => onStageChange(job.id, stage)}
+            className={cn(
+              'flex items-center gap-2 rounded-full border px-3 py-1 text-sm transition hover:shadow-sm',
+              isActive && 'border-primary bg-primary/10 text-primary font-medium',
+              !isActive && !isCompleted && 'border-muted text-muted-foreground',
+              isCompleted && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+            )}
+          >
+            {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Workflow className="h-3.5 w-3.5" />}
+            {stage}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const handleFitScore = async () => {
+    try {
+      const result = await fitMutation.mutateAsync({
+        jobDescription:
+          job.description ?? `${job.role} at ${job.company} located in ${job.location}. Priority ${job.priority}.`,
+        resumeHighlights: job.notes.join('\n') || 'Seasoned operator with track record of shipping outcomes.',
+      });
+      setFitResult({ score: result.fit_score, recommendations: result.recommendations ?? [] });
+    } catch (error) {
+      console.error('[fit-score] failed', error);
+    }
+  };
+
+  const handleOutreach = async () => {
+    try {
+      const result = await outreachMutation.mutateAsync({ company: job.company, role: job.role });
+      setOutreachResult(result);
+    } catch (error) {
+      console.error('[outreach] failed', error);
+    }
   };
 
   return (
@@ -79,6 +106,27 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         </div>
 
         <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleFitScore}
+              disabled={fitMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <GaugeCircle className="h-3.5 w-3.5" />
+              {fitMutation.isPending ? 'Scoring…' : 'Refresh fit score'}
+            </button>
+            <button
+              type="button"
+              onClick={handleOutreach}
+              disabled={outreachMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              {outreachMutation.isPending ? 'Generating…' : 'Draft outreach'}
+            </button>
+          </div>
+
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground">Stage Progress</h3>
             <div className="mt-3 flex flex-col gap-3">{renderStagePills()}</div>
@@ -94,9 +142,9 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Next touch</p>
                 <p className="text-sm font-semibold text-foreground">
-                  {job.followUpDate
-                    ? formatDistanceToNow(new Date(job.followUpDate), { addSuffix: true })
-                    : 'Not scheduled'}
+                  {job.followUpDate ?
+                    formatDistanceToNow(new Date(job.followUpDate), { addSuffix: true }) :
+                    'Not scheduled'}
                 </p>
               </div>
               <div className="rounded-xl border border-border p-3">
@@ -107,6 +155,33 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
               </div>
             </div>
           </div>
+
+          {fitResult ? (
+            <div className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+              <div className="flex items-center justify-between text-primary">
+                <span className="font-semibold">AI Fit Score</span>
+                <span className="text-base font-semibold">{fitResult.score}%</span>
+              </div>
+              <ul className="space-y-1 text-primary/80">
+                {fitResult.recommendations.map((item, index) => (
+                  <li key={`fit-${index}`} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/80" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {outreachResult ? (
+            <div className="space-y-2 rounded-xl border border-secondary/20 bg-secondary/10 p-4 text-sm">
+              <div className="text-secondary font-semibold">Suggested Outreach</div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary/80">Subject</p>
+              <p className="text-secondary/90">{outreachResult.subject}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary/80">Body</p>
+              <p className="whitespace-pre-wrap text-secondary/90">{outreachResult.body}</p>
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground">Notes & insights</h3>

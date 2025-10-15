@@ -1,33 +1,68 @@
 # Job Search Automation Hub
 
-This folder contains a standalone Vite + React + Tailwind project that packages the Job Search Automation Hub experience originally prototyped inside Night Market. You can copy this directory into a fresh repository and push it to GitHub as its own project.
+A Vite + React + Tailwind project that turns curated job feeds into a minimalist, AI-assisted control center. The app can operate entirely on the seeded demo data, or connect to a live Supabase backend with OpenAI-powered insights.
 
 ## Getting Started
 
 ```bash
 npm install
+
+# start the client (Vite)
 npm run dev
+
+# optional: run the AI/API helper server in another terminal
+npm run dev:server
 ```
 
-The development server starts on [http://localhost:5173](http://localhost:5173).
+The client listens on [http://localhost:5173](http://localhost:5173); the helper server defaults to [http://localhost:8787](http://localhost:8787).
+
+Create a `.env` (or `.env.local`) with Supabase/OpenAI credentials:
+
+```bash
+# Supabase project
+VITE_SUPABASE_URL="https://your-project.supabase.co"
+VITE_SUPABASE_ANON_KEY="public-anon-key"
+SUPABASE_URL="https://your-project.supabase.co"              # used by scripts
+SUPABASE_SERVICE_ROLE_KEY="service-role-key"                 # keep private
+
+# OpenAI + Express helper server
+OPENAI_API_KEY="sk-..."
+VITE_API_BASE_URL="http://localhost:8787"
+```
+
+Seed Supabase with the sample dataset (requires the service role key):
+
+```bash
+npm run seed:supabase
+```
+
+Ingest real postings from a public Greenhouse board:
+
+```bash
+npm run ingest:greenhouse -- <board-token>
+# example: npm run ingest:greenhouse -- stripe
+```
 
 ## Available Scripts
 
 - `npm run dev` – start the Vite development server
+- `npm run dev:server` – run the Express + OpenAI helper server
+- `npm run seed:supabase` – seed Supabase with sample matches/tasks
+- `npm run ingest:greenhouse` – import jobs from a Greenhouse board
 - `npm run build` – type check and build the production bundle
 - `npm run preview` – preview the production build locally
 
 ## Tech Stack
 
-- React 18 with TypeScript
-- Vite build tooling
-- Tailwind CSS for styling
-- Framer Motion for subtle animations
-- Lucide icons and date-fns utilities
+- React 18 with TypeScript + TanStack Query for data fetching/caching
+- Supabase (Postgres + pgvector ready) for job postings, matches, and tasks
+- Express helper server (`server/index.ts`) exposing `/api/fit-score` and `/api/outreach` via OpenAI GPT models
+- Vite + Tailwind CSS + Framer Motion for build and UI polish
 
 ## Notes
 
-- The UI data is seeded with sample job leads, tasks, and automation templates so the experience feels complete out of the box.
-- Tailwind CSS classes are embedded directly in the component; customize `tailwind.config.cjs` or the utility classes to match your design system.
-- Components are organized into domain directories (`src/components/pipeline`, `src/components/jobs`, `src/components/automation`) with shared primitives under `src/components/common`.
-- Feel free to adapt the project structure or integrate with your backend pipelines once it lives in its own repository.
+- When Supabase env variables are present, the UI loads live matches; otherwise it falls back to local fixtures.
+- `scripts/seedJobs.ts` plants example postings/matches/tasks into Supabase for quick demos.
+- `scripts/ingestGreenhouse.ts` upserts jobs from any public Greenhouse board and links them to matches.
+- Components follow a domain-first structure (`src/components/jobs`, `src/components/automation`, `src/components/dashboard`, `src/components/common`).
+- `server/index.ts` can be deployed separately (Render/Fly/etc.) or converted to Vercel serverless functions; set `VITE_API_BASE_URL` accordingly.

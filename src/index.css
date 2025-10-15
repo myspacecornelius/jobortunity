@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,33 +6,34 @@
 
 @layer base {
   :root {
-    --background: 38 43% 94%;
-    --surface: 168 33% 96%;
-    --card: 166 30% 95%;
-    --border: 166 18% 75%;
-    --input: 168 24% 88%;
-    --ring: 166 38% 40%;
-    --foreground: 210 24% 18%;
-    --muted: 164 23% 88%;
-    --muted-foreground: 168 18% 38%;
-    --primary: 166 43% 38%;
-    --primary-foreground: 60 52% 95%;
-    --secondary: 21 48% 58%;
-    --secondary-foreground: 42 52% 96%;
-    --accent: 156 36% 72%;
-    --accent-foreground: 168 28% 22%;
-    --pop: 211 58% 46%;
-    --pop-foreground: 0 0% 100%;
+    --background: 36 34% 96%;
+    --surface: 36 28% 98%;
+    --card: 0 0% 100%;
+    --border: 33 24% 85%;
+    --input: 36 20% 92%;
+    --ring: 245 72% 65%;
+    --foreground: 220 18% 20%;
+    --muted: 210 20% 94%;
+    --muted-foreground: 215 14% 45%;
+    --primary: 245 72% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 26 64% 54%;
+    --secondary-foreground: 30 100% 97%;
+    --accent: 210 60% 92%;
+    --accent-foreground: 217 32% 40%;
+    --pop: 162 50% 45%;
+    --pop-foreground: 154 90% 96%;
+    --positive: 146 40% 43%;
+    --positive-foreground: 144 55% 96%;
   }
 
   * {
-    @apply border-border;
+    @apply border-border outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus-visible:ring-offset-background;
   }
 
   body {
     @apply min-h-screen bg-background font-sans text-foreground antialiased;
-    background-image: var(--body-gradient, radial-gradient(circle at 12% 20%, rgba(53, 127, 114, 0.22) 0, rgba(53, 127, 114, 0) 55%), radial-gradient(circle at 82% 8%, rgba(198, 122, 90, 0.18) 0, rgba(198, 122, 90, 0) 50%), linear-gradient(125deg, rgba(242, 233, 217, 0.92), rgba(218, 230, 226, 0.96)));
-    background-attachment: fixed;
+    background-image: linear-gradient(180deg, hsla(36, 40%, 96%, 1) 0%, hsla(36, 34%, 96%, 0.92) 38%, hsla(210, 45%, 96%, 0.9) 100%);
     margin: 0;
   }
 

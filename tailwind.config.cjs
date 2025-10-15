@@ -6,7 +6,6 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['"InterVariable"', ...defaultTheme.fontFamily.sans],
-        display: ['"DM Serif Display"', ...defaultTheme.fontFamily.serif],
       },
       colors: {
         background: 'hsl(var(--background) / <alpha-value>)',
@@ -35,19 +34,23 @@ module.exports = {
           DEFAULT: 'hsl(var(--pop) / <alpha-value>)',
           foreground: 'hsl(var(--pop-foreground) / <alpha-value>)',
         },
+        positive: {
+          DEFAULT: 'hsl(var(--positive) / <alpha-value>)',
+          foreground: 'hsl(var(--positive-foreground) / <alpha-value>)',
+        },
         foreground: 'hsl(var(--foreground) / <alpha-value>)',
       },
       borderRadius: {
-        '2xl': '1.5rem',
-        '3xl': '2rem',
+        xl: '1rem',
+        '2xl': '1.4rem',
+        '3xl': '1.8rem',
       },
       boxShadow: {
-        'soft-lg': '0 24px 48px rgba(38, 61, 56, 0.12)',
-        'inner-card': 'inset 0 1px 0 rgba(255, 255, 255, 0.35)',
+        'soft-lg': '0 30px 60px rgba(20, 20, 20, 0.08)',
+        'inner-card': 'inset 0 1px 0 rgba(255, 255, 255, 0.6)',
       },
-      backgroundImage: {
-        'geodesic-grid':
-          'radial-gradient(circle at 12% 20%, rgba(53, 127, 114, 0.22) 0, rgba(53, 127, 114, 0) 55%), radial-gradient(circle at 82% 8%, rgba(198, 122, 90, 0.18) 0, rgba(198, 122, 90, 0) 50%), linear-gradient(125deg, rgba(242, 233, 217, 0.92), rgba(218, 230, 226, 0.96))',
+      transitionTimingFunction: {
+        'gentle-spring': 'cubic-bezier(0.21, 1, 0.27, 1)',
       },
     },
   },

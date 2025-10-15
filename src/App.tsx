@@ -1,24 +1,49 @@
-import React, { FormEvent, useMemo, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Briefcase, CalendarClock, CalendarRange, Sparkles, Bot } from 'lucide-react';
+import {
+  Briefcase,
+  CalendarClock,
+  CalendarRange,
+  Sparkles,
+  Bot,
+  Home,
+  UserRound,
+  SlidersHorizontal,
+  Mail,
+  Menu,
+  Search,
+} from 'lucide-react';
+
 import PipelineMetrics from './components/dashboard/PipelineMetrics';
 import JobDetailPanel from './components/jobs/JobDetailPanel';
-import PipelineSidebar from './components/pipeline/PipelineSidebar';
 import NextAutomations from './components/dashboard/NextAutomations';
 import StageAnalytics from './components/dashboard/StageAnalytics';
 import AutomationPlaybooks from './components/automation/AutomationPlaybooks';
 import OutreachTemplates from './components/automation/OutreachTemplates';
-import Card, { CardContent } from './components/common/Card';
+import JobMatchCard from './components/jobs/JobMatchCard';
+import Card from './components/common/Card';
 import { stageOrder } from './constants/stages';
-import type { JobFilters, JobLead, JobPriority, JobTask, JobTaskWithLead, NewJobFormState, OutreachTemplate, TaskStatus } from './types/job';
+import type {
+  JobFilters,
+  JobLead,
+  JobPriority,
+  JobTask,
+  JobTaskWithLead,
+  NewJobFormState,
+  OutreachTemplate,
+  TaskStatus,
+} from './types/job';
 import type { JobStage } from './constants/stages';
+import { cn } from './lib/cn';
+import { supabase } from './lib/supabaseClient';
+import { useAddJobMatch, useJobMatches, normalizeTasks } from './hooks/useJobMatches';
 
 const createId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const initialJobs: JobLead[] = [
+const fallbackJobs: JobLead[] = [
   {
     id: 'lead-1',
     company: 'Atlas Robotics',
@@ -32,6 +57,8 @@ const initialJobs: JobLead[] = [
     automationScore: 82,
     tags: ['AI', 'Product', 'Remote-first'],
     notes: ['Panel interview scheduled Friday', 'Hiring manager loves quant storytelling'],
+    description:
+      'Lead AI product strategy within an autonomous robotics platform. Partner with research, engineering, and GTM to ship intelligent capabilities.',
   },
   {
     id: 'lead-2',
@@ -46,6 +73,8 @@ const initialJobs: JobLead[] = [
     automationScore: 74,
     tags: ['Platform', 'Growth'],
     notes: ['Referred by alumni', 'Needs follow-up to recruiter on availability'],
+    description:
+      'Drive platform adoption and partner integrations, collaborating with enterprise accounts to design activation playbooks and measure product performance.',
   },
   {
     id: 'lead-3',
@@ -56,13 +85,16 @@ const initialJobs: JobLead[] = [
     priority: 'High',
     stage: 'Prospecting',
     lastTouchpoint: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+    followUpDate: undefined,
     automationScore: 68,
     tags: ['Healthcare', 'Operations'],
     notes: ['Need warm intro via LinkedIn group', 'Map product suite before outreach'],
+    description:
+      'Scale product operations across a care delivery platform. Establish rhythms, tooling, and insights that enable product squads to ship faster with higher quality.',
   },
 ];
 
-const initialTasks: JobTask[] = [
+const fallbackTasks: JobTask[] = [
   {
     id: 'task-1',
     jobId: 'lead-1',
@@ -140,11 +172,23 @@ Appreciate you!
   },
 ];
 
+const mapStatusToStage = (status: string): JobStage => {
+  const normalized = status.toLowerCase();
+  if (normalized.includes('apply')) return 'Applied';
+  if (normalized.includes('interview')) return 'Interviewing';
+  if (normalized.includes('offer')) return 'Offer';
+  if (normalized.includes('hire')) return 'Hired';
+  if (normalized.includes('arch')) return 'Archived';
+  return 'Prospecting';
+};
+
 const JobSearchAutomation: React.FC = () => {
-  const [jobs, setJobs] = useState<JobLead[]>(initialJobs);
-  const [tasks, setTasks] = useState<JobTask[]>(initialTasks);
-  const [selectedJobId, setSelectedJobId] = useState<string>(initialJobs[0]?.id ?? '');
+  const [localJobs, setLocalJobs] = useState<JobLead[]>(fallbackJobs);
+  const [localTasks, setLocalTasks] = useState<JobTask[]>(fallbackTasks);
+  const [selectedJobId, setSelectedJobId] = useState<string>(fallbackJobs[0]?.id ?? '');
   const [filters, setFilters] = useState<JobFilters>({ search: '', stage: 'all', priority: 'all' });
+  const [sortBy, setSortBy] = useState<'newest' | 'best'>('newest');
+  const [activeTab, setActiveTab] = useState<'matches' | 'applying' | 'applied'>('matches');
   const [newJob, setNewJob] = useState<NewJobFormState>({
     company: '',
     role: '',
@@ -154,8 +198,34 @@ const JobSearchAutomation: React.FC = () => {
     tags: '',
   });
 
+  const matchesQuery = useJobMatches();
+  const addJobMutation = useAddJobMatch();
+  const isRemote = Boolean(supabase);
+
+  const remoteMatches = matchesQuery.data ?? [];
+  const remoteJobs: JobLead[] = remoteMatches.map((match) => ({
+    id: match.id,
+    company: match.job_postings.company,
+    role: match.job_postings.role,
+    location: match.job_postings.location ?? 'Remote',
+    link: match.job_postings.url ?? '',
+    priority: (match.priority.charAt(0).toUpperCase() + match.priority.slice(1).toLowerCase()) as JobPriority,
+    stage: mapStatusToStage(match.status),
+    lastTouchpoint: match.last_touchpoint ?? new Date().toISOString(),
+    followUpDate: match.follow_up_at ?? undefined,
+    automationScore: match.fit_score ?? 70,
+    tags: match.tags ?? [],
+    notes: match.notes ?? [],
+    description: match.job_postings.description ?? undefined,
+  }));
+
+  const remoteTasks = normalizeTasks(remoteMatches);
+
+  const jobs = isRemote && remoteJobs.length ? remoteJobs : localJobs;
+  const tasks: JobTask[] = isRemote && remoteTasks.length ? remoteTasks : localTasks;
+
   const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
+    const filtered = jobs.filter((job) => {
       const matchesSearch = `${job.company} ${job.role} ${job.location}`
         .toLowerCase()
         .includes(filters.search.toLowerCase());
@@ -163,9 +233,24 @@ const JobSearchAutomation: React.FC = () => {
       const matchesPriority = filters.priority === 'all' || job.priority === filters.priority;
       return matchesSearch && matchesStage && matchesPriority;
     });
-  }, [filters.priority, filters.search, filters.stage, jobs]);
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'best') {
+        return b.automationScore - a.automationScore;
+      }
+      return new Date(b.lastTouchpoint).getTime() - new Date(a.lastTouchpoint).getTime();
+    });
+  }, [filters, jobs, sortBy]);
 
   const selectedJob = jobs.find((job) => job.id === selectedJobId) ?? filteredJobs[0] ?? null;
+
+  useEffect(() => {
+    if (!filteredJobs.length) return;
+    const stillVisible = filteredJobs.some((job) => job.id === selectedJobId);
+    if (!stillVisible) {
+      setSelectedJobId(filteredJobs[0].id);
+    }
+  }, [filteredJobs, selectedJobId]);
 
   const pipelineMetrics = useMemo(() => {
     const stageCounts = stageOrder.reduce<Record<JobStage, number>>((acc, stage) => {
@@ -236,7 +321,12 @@ const JobSearchAutomation: React.FC = () => {
   }, [jobs]);
 
   const handleStageChange = (jobId: string, stage: JobStage) => {
-    setJobs((prev) =>
+    if (isRemote) {
+      console.warn('[stage] Supabase mutation not implemented');
+      return;
+    }
+
+    setLocalJobs((prev) =>
       prev.map((job) =>
         job.id === jobId
           ? {
@@ -254,10 +344,10 @@ const JobSearchAutomation: React.FC = () => {
       ),
     );
 
-    setTasks((prev) => {
-      const generatedTasks: JobTask[] = [];
+    setLocalTasks((prev) => {
+      const generated: JobTask[] = [];
       if (stage === 'Interviewing') {
-        generatedTasks.push({
+        generated.push({
           id: `task-${createId()}`,
           jobId,
           title: 'Automate interview prep kit (stories + metrics)',
@@ -268,7 +358,7 @@ const JobSearchAutomation: React.FC = () => {
         });
       }
       if (stage === 'Offer') {
-        generatedTasks.push({
+        generated.push({
           id: `task-${createId()}`,
           jobId,
           title: 'Generate negotiation brief & market calibration',
@@ -278,15 +368,25 @@ const JobSearchAutomation: React.FC = () => {
           autoGenerated: true,
         });
       }
-      return [...prev, ...generatedTasks];
+      return [...prev, ...generated];
     });
   };
 
   const handleTaskStatus = (taskId: string, status: TaskStatus) => {
-    setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status } : task)));
+    if (isRemote) {
+      console.warn('[task] Supabase mutation not implemented');
+      return;
+    }
+
+    setLocalTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status } : task)));
   };
 
   const handleScheduleFollowUp = (job: JobLead) => {
+    if (isRemote) {
+      console.warn('[schedule] Implement Supabase mutation for scheduling follow-ups.');
+      return;
+    }
+
     const dueDate = new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString();
     const newTask: JobTask = {
       id: `task-${createId()}`,
@@ -298,11 +398,16 @@ const JobSearchAutomation: React.FC = () => {
       autoGenerated: true,
     };
 
-    setTasks((prev) => [newTask, ...prev]);
-    setJobs((prev) => prev.map((lead) => (lead.id === job.id ? { ...lead, followUpDate: dueDate } : lead)));
+    setLocalTasks((prev) => [newTask, ...prev]);
+    setLocalJobs((prev) => prev.map((lead) => (lead.id === job.id ? { ...lead, followUpDate: dueDate } : lead)));
   };
 
   const handleGenerateWeeklyPlan = () => {
+    if (isRemote) {
+      console.warn('[plan] Implement Supabase automation generation.');
+      return;
+    }
+
     const planTasks: JobTask[] = jobs.flatMap((job) => {
       const tasksForJob: JobTask[] = [];
       if (job.stage === 'Prospecting') {
@@ -341,16 +446,34 @@ const JobSearchAutomation: React.FC = () => {
       return tasksForJob;
     });
 
-    setTasks((prev) => [...planTasks, ...prev]);
+    setLocalTasks((prev) => [...planTasks, ...prev]);
   };
 
-  const handleAddJob = (event: FormEvent<HTMLFormElement>) => {
+  const handleAddJob = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const id = `lead-${createId()}`;
     const tags = newJob.tags
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean);
+
+    if (isRemote) {
+      try {
+        await addJobMutation.mutateAsync({
+          company: newJob.company,
+          role: newJob.role,
+          location: newJob.location,
+          link: newJob.link,
+          priority: newJob.priority,
+          tags: tags.length ? tags : ['Custom'],
+        });
+        await matchesQuery.refetch();
+        setNewJob({ company: '', role: '', location: '', link: '', priority: 'Medium', tags: '' });
+      } catch (error) {
+        console.error('[addJob] failed to insert job', error);
+      }
+      return;
+    }
 
     const job: JobLead = {
       id,
@@ -364,9 +487,10 @@ const JobSearchAutomation: React.FC = () => {
       automationScore: 60 + Math.floor(Math.random() * 20),
       tags: tags.length ? tags : ['Custom'],
       notes: ['Auto-create sequences & score leads'],
+      description: '',
     };
 
-    setJobs((prev) => [job, ...prev]);
+    setLocalJobs((prev) => [job, ...prev]);
     setSelectedJobId(id);
     setNewJob({ company: '', role: '', location: '', link: '', priority: 'Medium', tags: '' });
   };
@@ -383,103 +507,307 @@ const JobSearchAutomation: React.FC = () => {
   };
 
   return (
-    <motion.div
-      className="relative mx-auto max-w-7xl space-y-12 px-4 pb-16 pt-10 sm:px-6 lg:px-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="pointer-events-none absolute -top-40 left-[-10%] h-80 w-80 rounded-[42%] bg-primary/25 blur-3xl" />
-      <div className="pointer-events-none absolute top-24 right-[-12%] h-96 w-96 rounded-[48%] bg-secondary/20 blur-[140px]" />
-
-      <motion.div
-        className="relative overflow-hidden rounded-3xl border border-border bg-card/90 p-8 shadow-soft-lg backdrop-blur-sm md:flex md:items-center md:justify-between md:gap-10"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.1 }}
-      >
-        <div className="pointer-events-none absolute -right-24 top-16 h-64 w-64 rounded-full bg-accent/30 blur-3xl" />
-        <div className="pointer-events-none absolute -left-28 -top-28 h-60 w-60 rotate-12 rounded-[40%] border border-accent/30" />
-
-        <div className="relative flex items-start gap-5">
-          <div className="rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 p-3 shadow-inner-card">
-            <Briefcase className="h-7 w-7 text-primary" />
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-lg">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+              <Briefcase className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-base font-semibold leading-tight">Jobortunity</span>
+              <p className="text-xs text-muted-foreground">Land more interviews</p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">Automation Studio</p>
-            <h1 className="font-display text-3xl leading-snug text-foreground md:text-[2.6rem]">
-              Nature-bred intelligence for your job search pipeline
-            </h1>
-            <p className="max-w-xl text-base text-muted-foreground">
-              Connect the calm of a well-tended ecosystem with the precision of applied science. Monitor roles,
-              calibrate outreach, and let purpose-built automations do the heavy lifting.
-            </p>
+          <nav className="hidden items-center gap-3 md:flex">
+            {[
+              { icon: Home, label: 'Home', active: true },
+              { icon: UserRound, label: 'Profile', active: false },
+              { icon: SlidersHorizontal, label: 'Filters', active: false },
+              { icon: Mail, label: 'Inbox', active: false, badge: 3 },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className={cn(
+                  'relative inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition',
+                  item.active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+                {'badge' in item && item.badge ? (
+                  <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="inline-flex items-center justify-center rounded-full border border-border p-2 text-muted-foreground transition hover:text-foreground md:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </nav>
+        </div>
+        <div className="border-t border-border/60">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
+            {[
+              { key: 'matches', label: 'Job Matches', badge: filteredJobs.length },
+              { key: 'applying', label: 'Applying' },
+              { key: 'applied', label: 'Applied' },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key as typeof activeTab)}
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition',
+                  activeTab === tab.key
+                    ? 'bg-primary text-primary-foreground shadow-soft-lg'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {tab.label}
+                {tab.badge !== undefined ? (
+                  <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold text-primary">
+                    {tab.badge}
+                  </span>
+                ) : null}
+              </button>
+            ))}
           </div>
         </div>
-        <div className="relative mt-6 flex flex-wrap items-center gap-3 md:mt-0 md:flex-nowrap">
-          <button
-            onClick={handleGenerateWeeklyPlan}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-soft-lg transition hover:bg-primary/90"
-          >
-            <Sparkles className="h-4 w-4" /> Generate Weekly Plan
-          </button>
-          <button
-            onClick={() => selectedJob && handleScheduleFollowUp(selectedJob)}
-            disabled={!selectedJob}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium text-foreground transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <CalendarRange className="h-4 w-4" /> Schedule Follow-up
-          </button>
-        </div>
-      </motion.div>
+      </header>
 
-      <PipelineMetrics
-        activeLeads={pipelineMetrics.activeLeads}
-        totalLeads={jobs.length}
-        automationAverage={pipelineMetrics.automationAverage}
-        upcomingFollowUps={pipelineMetrics.upcomingFollowUps}
-        momentumScore={Math.min(100, pipelineMetrics.activeLeads * 12 + pipelineMetrics.upcomingFollowUps * 4)}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_1.4fr_1fr]">
-        <PipelineSidebar
-          filters={filters}
-          filteredJobs={filteredJobs}
-          selectedJobId={selectedJob?.id}
-          onSelectJob={(jobId) => setSelectedJobId(jobId)}
-          onFilterChange={handleFilterChange}
-          newJob={newJob}
-          onNewJobChange={handleNewJobFieldChange}
-          onSubmitNewJob={handleAddJob}
-        />
-
-        <div className="space-y-6">
-          {selectedJob ? (
-            <JobDetailPanel
-              job={selectedJob}
-              tasks={jobTasks}
-              onStageChange={handleStageChange}
-              onScheduleFollowUp={handleScheduleFollowUp}
-              onTaskStatusChange={handleTaskStatus}
-            />
-          ) : (
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="space-y-6">
             <Card className="p-6">
-              <CardContent className="rounded-2xl border border-dashed border-border bg-surface/80 p-8 text-center text-sm text-muted-foreground">
-                Select a lead from the left to see automation insights.
-              </CardContent>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Job Matches</p>
+                  <h1 className="mt-1 text-2xl font-semibold text-foreground">Curated roles for your workflow</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Review, prioritize, and queue automations. Stay focused on the outreach that moves the needle.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleGenerateWeeklyPlan}
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft-lg transition hover:bg-primary/90"
+                  >
+                    <Sparkles className="h-4 w-4" /> Generate Plan
+                  </button>
+                  <button
+                    onClick={() => selectedJob && handleScheduleFollowUp(selectedJob)}
+                    disabled={!selectedJob}
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <CalendarRange className="h-4 w-4" /> Schedule Follow-up
+                  </button>
+                </div>
+              </div>
             </Card>
-          )}
 
-          <OutreachTemplates templates={outreachTemplates} />
-        </div>
+            <div className="sticky top-[104px] z-20 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-soft-lg backdrop-blur-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-1 items-center gap-2 rounded-full border border-transparent bg-surface px-4 py-2 transition focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/30">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    value={filters.search}
+                    onChange={(event) => handleFilterChange('search', event.target.value)}
+                    placeholder="Search by company, role, or location"
+                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <select
+                    value={filters.stage}
+                    onChange={(event) => handleFilterChange('stage', event.target.value)}
+                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition hover:border-primary/30"
+                  >
+                    <option value="all">All stages</option>
+                    {stageOrder.map((stage) => (
+                      <option key={stage} value={stage}>
+                        {stage}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={filters.priority}
+                    onChange={(event) => handleFilterChange('priority', event.target.value)}
+                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition hover:border-primary/30"
+                  >
+                    <option value="all">Any priority</option>
+                    <option value="High">High priority</option>
+                    <option value="Medium">Medium priority</option>
+                    <option value="Low">Low priority</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Sort</span>
+                {[
+                  { key: 'newest', label: 'Newest' },
+                  { key: 'best', label: 'Best match' },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setSortBy(option.key as typeof sortBy)}
+                    className={cn(
+                      'rounded-full px-3 py-1.5 text-xs font-medium transition',
+                      sortBy === option.key
+                        ? 'bg-primary text-primary-foreground shadow-soft-lg'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="space-y-6">
-          <NextAutomations tasks={nextFollowUps} />
-          <AutomationPlaybooks ideas={automationIdeas} />
-          <StageAnalytics stageCounts={pipelineMetrics.stageCounts} />
+            <div className="space-y-4">
+              {isRemote && matchesQuery.isLoading ? (
+                <Card className="p-6 text-sm text-muted-foreground">Loading job matches…</Card>
+              ) : null}
+
+              {isRemote && matchesQuery.isError ? (
+                <Card className="p-6 text-sm text-muted-foreground">
+                  Unable to load matches from Supabase. Check your credentials and try again.
+                </Card>
+              ) : null}
+
+              {!matchesQuery.isLoading && filteredJobs.length === 0 ? (
+                <Card className="p-6 text-sm text-muted-foreground">
+                  No roles match those filters. Adjust filters or add an opportunity manually.
+                </Card>
+              ) : null}
+
+              {filteredJobs.map((job) => (
+                <JobMatchCard
+                  key={job.id}
+                  job={job}
+                  isSelected={selectedJob?.id === job.id}
+                  onSelect={() => setSelectedJobId(job.id)}
+                />
+              ))}
+
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold text-foreground">Track a manual opportunity</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Stay organized by logging new roles from referrals or niche communities.
+                </p>
+                <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={handleAddJob}>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Company</label>
+                    <input
+                      required
+                      value={newJob.company}
+                      onChange={(event) => handleNewJobFieldChange('company', event.target.value)}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
+                      placeholder="Acme Robotics"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Role</label>
+                    <input
+                      required
+                      value={newJob.role}
+                      onChange={(event) => handleNewJobFieldChange('role', event.target.value)}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
+                      placeholder="Senior Product Manager"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Location</label>
+                    <input
+                      required
+                      value={newJob.location}
+                      onChange={(event) => handleNewJobFieldChange('location', event.target.value)}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
+                      placeholder="Remote, NYC..."
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Link</label>
+                    <input
+                      value={newJob.link}
+                      onChange={(event) => handleNewJobFieldChange('link', event.target.value)}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
+                      placeholder="https://"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Priority</label>
+                    <select
+                      value={newJob.priority}
+                      onChange={(event) => handleNewJobFieldChange('priority', event.target.value)}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
+                    >
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Tags</label>
+                    <input
+                      value={newJob.tags}
+                      onChange={(event) => handleNewJobFieldChange('tags', event.target.value)}
+                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
+                      placeholder="AI, Seed Stage"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft-lg transition hover:bg-primary/90"
+                    >
+                      <Sparkles className="h-4 w-4" /> Add opportunity
+                    </button>
+                  </div>
+                </form>
+              </Card>
+            </div>
+          </section>
+
+          <aside className="space-y-6">
+            <PipelineMetrics
+              activeLeads={pipelineMetrics.activeLeads}
+              totalLeads={jobs.length}
+              automationAverage={pipelineMetrics.automationAverage}
+              upcomingFollowUps={pipelineMetrics.upcomingFollowUps}
+              momentumScore={Math.min(100, pipelineMetrics.activeLeads * 12 + pipelineMetrics.upcomingFollowUps * 4)}
+            />
+
+            {selectedJob ? (
+              <JobDetailPanel
+                job={selectedJob}
+                tasks={jobTasks}
+                onStageChange={handleStageChange}
+                onScheduleFollowUp={handleScheduleFollowUp}
+                onTaskStatusChange={handleTaskStatus}
+              />
+            ) : (
+              <Card className="p-6 text-center text-sm text-muted-foreground">
+                Select a role from the list to preview automation insights.
+              </Card>
+            )}
+
+            <NextAutomations tasks={nextFollowUps} />
+            <AutomationPlaybooks ideas={automationIdeas} />
+            <StageAnalytics stageCounts={pipelineMetrics.stageCounts} />
+            <OutreachTemplates templates={outreachTemplates} />
+          </aside>
         </div>
-      </div>
-    </motion.div>
+      </main>
+    </div>
   );
 };
 
