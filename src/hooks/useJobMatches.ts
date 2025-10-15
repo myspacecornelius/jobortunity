@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { supabase } from '../lib/supabaseClient';
 import type { JobPriority, JobTask, JobTaskWithLead } from '../types/job';
+import type { JobStage } from '../constants/stages';
 
 const jobMatchSchema = z.object({
   id: z.string(),
@@ -128,6 +129,15 @@ export const normalizeTasks = (
   matches: Awaited<ReturnType<typeof useJobMatches>['data']>,
 ): JobTaskWithLead[] => {
   if (!matches) return [];
+  const statusToStage = (status: string): JobStage => {
+    const normalized = status.toLowerCase();
+    if (normalized.includes('apply')) return 'Applied';
+    if (normalized.includes('interview')) return 'Interviewing';
+    if (normalized.includes('offer')) return 'Offer';
+    if (normalized.includes('hire')) return 'Hired';
+    if (normalized.includes('arch')) return 'Archived';
+    return 'Prospecting';
+  };
   const mapCategory = (category: string | null | undefined): JobTask['category'] => {
     const normalized = (category ?? '').toLowerCase();
     if (normalized.includes('outreach')) return 'Outreach';
@@ -159,7 +169,7 @@ export const normalizeTasks = (
         location: match.job_postings.location ?? 'Remote',
         link: match.job_postings.url ?? '',
         priority: (match.priority.charAt(0).toUpperCase() + match.priority.slice(1).toLowerCase()) as JobPriority,
-        stage: 'Prospecting',
+        stage: statusToStage(match.status),
         lastTouchpoint: match.last_touchpoint ?? new Date().toISOString(),
         automationScore: match.fit_score ?? 70,
         tags: match.tags ?? [],

@@ -37,6 +37,7 @@ import type { JobStage } from './constants/stages';
 import { cn } from './lib/cn';
 import { supabase } from './lib/supabaseClient';
 import { useAddJobMatch, useJobMatches, normalizeTasks } from './hooks/useJobMatches';
+import { useJobMutations } from './hooks/useJobMutations';
 
 const createId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -200,6 +201,7 @@ const JobSearchAutomation: React.FC = () => {
 
   const matchesQuery = useJobMatches();
   const addJobMutation = useAddJobMatch();
+  const { updateStage, updateTaskStatus, scheduleFollowUp } = useJobMutations();
   const isRemote = Boolean(supabase);
 
   const remoteMatches = matchesQuery.data ?? [];
@@ -222,7 +224,11 @@ const JobSearchAutomation: React.FC = () => {
   const remoteTasks = normalizeTasks(remoteMatches);
 
   const jobs = isRemote && remoteJobs.length ? remoteJobs : localJobs;
-  const tasks: JobTaskWithLead[] = isRemote && remoteTasks.length ? remoteTasks : (localTasks as JobTaskWithLead[]);
+  const localTasksWithJob: JobTaskWithLead[] = localTasks.map((task) => ({
+    ...task,
+    job: localJobs.find((job) => job.id === task.jobId),
+  }));
+  const tasks: JobTaskWithLead[] = isRemote && remoteTasks.length ? remoteTasks : localTasksWithJob;
 
   const filteredJobs = useMemo(() => {
     const filtered = jobs.filter((job) => {
@@ -322,7 +328,7 @@ const JobSearchAutomation: React.FC = () => {
 
   const handleStageChange = (jobId: string, stage: JobStage) => {
     if (isRemote) {
-      console.warn('[stage] Supabase mutation not implemented');
+      updateStage.mutate({ matchId: jobId, stage });
       return;
     }
 
@@ -374,7 +380,7 @@ const JobSearchAutomation: React.FC = () => {
 
   const handleTaskStatus = (taskId: string, status: TaskStatus) => {
     if (isRemote) {
-      console.warn('[task] Supabase mutation not implemented');
+      updateTaskStatus.mutate({ taskId, status });
       return;
     }
 
@@ -383,7 +389,7 @@ const JobSearchAutomation: React.FC = () => {
 
   const handleScheduleFollowUp = (job: JobLead) => {
     if (isRemote) {
-      console.warn('[schedule] Implement Supabase mutation for scheduling follow-ups.');
+      scheduleFollowUp.mutate({ matchId: job.id, job });
       return;
     }
 
