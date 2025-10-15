@@ -346,6 +346,19 @@ const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                   </ul>
                 </div>
               </div>
+              {fitResult.risks.length ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/70">Risks</p>
+                  <ul className="space-y-1 text-primary/80">
+                    {fitResult.risks.map((item, index) => (
+                      <li key={`risk-${index}`} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary/60" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary/70">Next moves</p>
               <ul className="space-y-1 text-primary/80">
                 {fitResult.recommended_actions.map((item, index) => (

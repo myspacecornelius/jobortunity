@@ -1,14 +1,11 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
 import {
   Briefcase,
   CalendarClock,
   CalendarRange,
   Sparkles,
   Bot,
-  Home,
   UserRound,
-  SlidersHorizontal,
   Mail,
   Menu,
   Search,
@@ -22,6 +19,9 @@ import AutomationPlaybooks from './components/automation/AutomationPlaybooks';
 import OutreachTemplates from './components/automation/OutreachTemplates';
 import JobMatchCard from './components/jobs/JobMatchCard';
 import Card from './components/common/Card';
+import SidebarNavigation from './components/layout/SidebarNavigation';
+import JobMatchSkeleton from './components/jobs/JobMatchSkeleton';
+import JobDetailSkeleton from './components/jobs/JobDetailSkeleton';
 import { stageOrder } from './constants/stages';
 import type {
   JobFilters,
@@ -198,6 +198,7 @@ const JobSearchAutomation: React.FC = () => {
     priority: 'Medium',
     tags: '',
   });
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   const matchesQuery = useJobMatches();
   const addJobMutation = useAddJobMatch();
@@ -325,6 +326,9 @@ const JobSearchAutomation: React.FC = () => {
       },
     ];
   }, [jobs]);
+
+  const isLoadingMatches = isRemote && matchesQuery.isLoading;
+  const isErrorMatches = isRemote && matchesQuery.isError;
 
   const handleStageChange = (jobId: string, stage: JobStage) => {
     if (isRemote) {
@@ -514,81 +518,80 @@ const JobSearchAutomation: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur-lg">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
-              <Briefcase className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="text-base font-semibold leading-tight">Jobortunity</span>
-              <p className="text-xs text-muted-foreground">Land more interviews</p>
-            </div>
-          </div>
-          <nav className="hidden items-center gap-3 md:flex">
-            {[
-              { icon: Home, label: 'Home', active: true },
-              { icon: UserRound, label: 'Profile', active: false },
-              { icon: SlidersHorizontal, label: 'Filters', active: false },
-              { icon: Mail, label: 'Inbox', active: false, badge: 3 },
-            ].map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                className={cn(
-                  'relative inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition',
-                  item.active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-                {'badge' in item && item.badge ? (
-                  <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                    {item.badge}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-full border border-border p-2 text-muted-foreground transition hover:text-foreground md:hidden"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-          </nav>
-        </div>
-        <div className="border-t border-border/60">
-          <div className="mx-auto flex max-w-6xl items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-            {[
-              { key: 'matches', label: 'Job Matches', badge: filteredJobs.length },
-              { key: 'applying', label: 'Applying' },
-              { key: 'applied', label: 'Applied' },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition',
-                  activeTab === tab.key
-                    ? 'bg-primary text-primary-foreground shadow-soft-lg'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {tab.label}
-                {tab.badge !== undefined ? (
-                  <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold text-primary">
-                    {tab.badge}
-                  </span>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
+      <div className="flex min-h-screen">
+        <aside className="sticky top-0 hidden h-screen w-64 lg:block">
+          <SidebarNavigation activeLabel="Matches" />
+        </aside>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-1 flex-col">
+          <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsMobileNavOpen(true)}
+                  className="inline-flex items-center justify-center rounded-full border border-border p-2 text-muted-foreground transition hover:text-primary lg:hidden"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                  <Briefcase className="h-5 w-5" />
+                </div>
+                <div>
+                  <span className="text-base font-semibold leading-tight">Jobortunity</span>
+                  <p className="text-xs text-muted-foreground">Land more interviews</p>
+                </div>
+              </div>
+              <div className="hidden items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 md:flex">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <input
+                  value={filters.search}
+                  onChange={(event) => handleFilterChange('search', event.target.value)}
+                  placeholder="Search roles, companies, locations"
+                  className="w-60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
+                />
+              </div>
+              <div className="hidden items-center gap-3 md:flex">
+                <button className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground">
+                  <UserRound className="mr-2 h-4 w-4" /> Profile
+                </button>
+                <button className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground">
+                  <Mail className="mr-2 h-4 w-4" /> Inbox
+                </button>
+              </div>
+            </div>
+            <div className="border-t border-border/60">
+              <div className="mx-auto flex max-w-6xl items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
+                {[
+                  { key: 'matches', label: 'Job Matches', badge: filteredJobs.length },
+                  { key: 'applying', label: 'Applying' },
+                  { key: 'applied', label: 'Applied' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key as typeof activeTab)}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition',
+                      activeTab === tab.key
+                        ? 'bg-primary text-primary-foreground shadow-soft-lg'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {tab.label}
+                    {tab.badge !== undefined ? (
+                      <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold text-primary">
+                        {tab.badge}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </header>
+
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="space-y-6">
             <Card className="p-6">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -679,30 +682,30 @@ const JobSearchAutomation: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              {isRemote && matchesQuery.isLoading ? (
-                <Card className="p-6 text-sm text-muted-foreground">Loading job matches…</Card>
-              ) : null}
+              {isLoadingMatches ? <JobMatchSkeleton count={3} /> : null}
 
-              {isRemote && matchesQuery.isError ? (
+              {isErrorMatches ? (
                 <Card className="p-6 text-sm text-muted-foreground">
                   Unable to load matches from Supabase. Check your credentials and try again.
                 </Card>
               ) : null}
 
-              {!matchesQuery.isLoading && filteredJobs.length === 0 ? (
+              {!isLoadingMatches && !isErrorMatches && filteredJobs.length === 0 ? (
                 <Card className="p-6 text-sm text-muted-foreground">
                   No roles match those filters. Adjust filters or add an opportunity manually.
                 </Card>
               ) : null}
 
-              {filteredJobs.map((job) => (
-                <JobMatchCard
-                  key={job.id}
-                  job={job}
-                  isSelected={selectedJob?.id === job.id}
-                  onSelect={() => setSelectedJobId(job.id)}
-                />
-              ))}
+              {!isLoadingMatches && !isErrorMatches
+                ? filteredJobs.map((job) => (
+                    <JobMatchCard
+                      key={job.id}
+                      job={job}
+                      isSelected={selectedJob?.id === job.id}
+                      onSelect={() => setSelectedJobId(job.id)}
+                    />
+                  ))
+                : null}
 
               <Card className="p-6">
                 <h3 className="text-lg font-semibold text-foreground">Track a manual opportunity</h3>
@@ -792,7 +795,9 @@ const JobSearchAutomation: React.FC = () => {
               momentumScore={Math.min(100, pipelineMetrics.activeLeads * 12 + pipelineMetrics.upcomingFollowUps * 4)}
             />
 
-            {selectedJob ? (
+            {isLoadingMatches && !selectedJob ? (
+              <JobDetailSkeleton />
+            ) : selectedJob ? (
               <JobDetailPanel
                 job={selectedJob}
                 tasks={jobTasks}
@@ -812,7 +817,32 @@ const JobSearchAutomation: React.FC = () => {
             <OutreachTemplates templates={outreachTemplates} />
           </aside>
         </div>
-      </main>
+          </main>
+        </div>
+      </div>
+
+      {isMobileNavOpen ? (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm lg:hidden" onClick={() => setIsMobileNavOpen(false)}>
+          <div
+            className="absolute bottom-0 left-0 right-0 max-h-[80vh] rounded-t-3xl border border-border/60 bg-background/95 p-6 shadow-soft-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-muted-foreground">Navigation</span>
+              <button
+                type="button"
+                onClick={() => setIsMobileNavOpen(false)}
+                className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground"
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <SidebarNavigation activeLabel="Matches" />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
