@@ -16,11 +16,6 @@ yarn-error.log*
 pnpm-debug.log*
 dev-server.log
 
-# environment
-.env
-.env.local
-.env.*
-
 # editor
 .DS_Store
 .vscode/
