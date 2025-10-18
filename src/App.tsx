@@ -1,27 +1,15 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
-  Briefcase,
   CalendarClock,
-  CalendarRange,
   Sparkles,
   Bot,
-  UserRound,
-  Mail,
-  Menu,
-  Search,
 } from 'lucide-react';
 
-import PipelineMetrics from './components/dashboard/PipelineMetrics';
-import JobDetailPanel from './components/jobs/JobDetailPanel';
-import NextAutomations from './components/dashboard/NextAutomations';
-import StageAnalytics from './components/dashboard/StageAnalytics';
-import AutomationPlaybooks from './components/automation/AutomationPlaybooks';
-import OutreachTemplates from './components/automation/OutreachTemplates';
-import JobMatchCard from './components/jobs/JobMatchCard';
-import Card from './components/common/Card';
+import JobMatchesView from './components/jobs/JobMatchesView';
+import PipelineView from './components/dashboard/PipelineView';
+import AppHeader from './components/layout/AppHeader';
 import SidebarNavigation from './components/layout/SidebarNavigation';
-import JobMatchSkeleton from './components/jobs/JobMatchSkeleton';
-import JobDetailSkeleton from './components/jobs/JobDetailSkeleton';
+import PipelineSidebar from './components/pipeline/PipelineSidebar';
 import { stageOrder } from './constants/stages';
 import type {
   JobFilters,
@@ -38,6 +26,8 @@ import { cn } from './lib/cn';
 import { supabase } from './lib/supabaseClient';
 import { useAddJobMatch, useJobMatches, normalizeTasks } from './hooks/useJobMatches';
 import { useJobMutations } from './hooks/useJobMutations';
+import { useAuth } from './providers/AuthProvider';
+import AuthGate from './components/auth/AuthGate';
 
 const createId = () =>
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -184,6 +174,7 @@ const mapStatusToStage = (status: string): JobStage => {
 };
 
 const JobSearchAutomation: React.FC = () => {
+  const { status: authStatus, user, signOut } = useAuth();
   const [localJobs, setLocalJobs] = useState<JobLead[]>(fallbackJobs);
   const [localTasks, setLocalTasks] = useState<JobTask[]>(fallbackTasks);
   const [selectedJobId, setSelectedJobId] = useState<string>(fallbackJobs[0]?.id ?? '');
@@ -203,9 +194,11 @@ const JobSearchAutomation: React.FC = () => {
   const matchesQuery = useJobMatches();
   const addJobMutation = useAddJobMatch();
   const { updateStage, updateTaskStatus, scheduleFollowUp } = useJobMutations();
-  const isRemote = Boolean(supabase);
+  
+  const supabaseEnabled = Boolean(supabase);
+  const isRemote = supabaseEnabled && authStatus === 'signed-in';
 
-  const remoteMatches = matchesQuery.data ?? [];
+  const remoteMatches = isRemote ? matchesQuery.data ?? [] : [];
   const remoteJobs: JobLead[] = remoteMatches.map((match) => ({
     id: match.id,
     company: match.job_postings.company,
@@ -222,7 +215,7 @@ const JobSearchAutomation: React.FC = () => {
     description: match.job_postings.description ?? undefined,
   }));
 
-  const remoteTasks = normalizeTasks(remoteMatches);
+  const remoteTasks = isRemote ? normalizeTasks(remoteMatches) : [];
 
   const jobs = isRemote && remoteJobs.length ? remoteJobs : localJobs;
   const localTasksWithJob: JobTaskWithLead[] = localTasks.map((task) => ({
@@ -516,6 +509,21 @@ const JobSearchAutomation: React.FC = () => {
     }));
   };
 
+  // Early returns after all hooks are called
+  if (supabaseEnabled) {
+    if (authStatus === 'loading') {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+          Preparing your workspace…
+        </div>
+      );
+    }
+
+    if (authStatus === 'signed-out') {
+      return <AuthGate />;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
@@ -524,299 +532,60 @@ const JobSearchAutomation: React.FC = () => {
         </aside>
 
         <div className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-40 border-b border-border/60 bg-background/90 backdrop-blur">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsMobileNavOpen(true)}
-                  className="inline-flex items-center justify-center rounded-full border border-border p-2 text-muted-foreground transition hover:text-primary lg:hidden"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
-                  <Briefcase className="h-5 w-5" />
-                </div>
-                <div>
-                  <span className="text-base font-semibold leading-tight">Jobortunity</span>
-                  <p className="text-xs text-muted-foreground">Land more interviews</p>
-                </div>
-              </div>
-              <div className="hidden items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 md:flex">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <input
-                  value={filters.search}
-                  onChange={(event) => handleFilterChange('search', event.target.value)}
-                  placeholder="Search roles, companies, locations"
-                  className="w-60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
-                />
-              </div>
-              <div className="hidden items-center gap-3 md:flex">
-                <button className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground">
-                  <UserRound className="mr-2 h-4 w-4" /> Profile
-                </button>
-                <button className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground">
-                  <Mail className="mr-2 h-4 w-4" /> Inbox
-                </button>
-              </div>
-            </div>
-            <div className="border-t border-border/60">
-              <div className="mx-auto flex max-w-6xl items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
-                {[
-                  { key: 'matches', label: 'Job Matches', badge: filteredJobs.length },
-                  { key: 'applying', label: 'Applying' },
-                  { key: 'applied', label: 'Applied' },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setActiveTab(tab.key as typeof activeTab)}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium transition',
-                      activeTab === tab.key
-                        ? 'bg-primary text-primary-foreground shadow-soft-lg'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {tab.label}
-                    {tab.badge !== undefined ? (
-                      <span className="rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold text-primary">
-                        {tab.badge}
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </header>
+          <AppHeader
+            filters={filters}
+            filteredJobsCount={filteredJobs.length}
+            activeTab={activeTab}
+            isRemote={isRemote}
+            user={user}
+            onFilterChange={handleFilterChange}
+            onTabChange={setActiveTab}
+            onMobileNavToggle={() => setIsMobileNavOpen(true)}
+            onSignOut={() => signOut().catch((error) => console.error('[auth] sign out failed', error))}
+          />
 
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="space-y-6">
-            <Card className="p-6">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Job Matches</p>
-                  <h1 className="mt-1 text-2xl font-semibold text-foreground">Curated roles for your workflow</h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Review, prioritize, and queue automations. Stay focused on the outreach that moves the needle.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={handleGenerateWeeklyPlan}
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft-lg transition hover:bg-primary/90"
-                  >
-                    <Sparkles className="h-4 w-4" /> Generate Plan
-                  </button>
-                  <button
-                    onClick={() => selectedJob && handleScheduleFollowUp(selectedJob)}
-                    disabled={!selectedJob}
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <CalendarRange className="h-4 w-4" /> Schedule Follow-up
-                  </button>
-                </div>
+            <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)_320px]">
+              <div className="space-y-6">
+                <PipelineSidebar
+                  filters={filters}
+                  filteredJobs={filteredJobs}
+                  selectedJobId={selectedJobId}
+                  onSelectJob={(id) => setSelectedJobId(id)}
+                  onFilterChange={handleFilterChange}
+                  newJob={newJob}
+                  onNewJobChange={handleNewJobFieldChange}
+                  onSubmitNewJob={handleAddJob}
+                />
               </div>
-            </Card>
+              <JobMatchesView
+                filteredJobs={filteredJobs}
+                selectedJob={selectedJob}
+                sortBy={sortBy}
+                filters={filters}
+                isLoadingMatches={isLoadingMatches}
+                isErrorMatches={isErrorMatches}
+                onSelectJob={setSelectedJobId}
+                onFilterChange={handleFilterChange}
+                onSortChange={setSortBy}
+                onGenerateWeeklyPlan={handleGenerateWeeklyPlan}
+                onScheduleFollowUp={handleScheduleFollowUp}
+              />
 
-            <div className="sticky top-[104px] z-20 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-soft-lg backdrop-blur-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 items-center gap-2 rounded-full border border-transparent bg-surface px-4 py-2 transition focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/30">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <input
-                    value={filters.search}
-                    onChange={(event) => handleFilterChange('search', event.target.value)}
-                    placeholder="Search by company, role, or location"
-                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <select
-                    value={filters.stage}
-                    onChange={(event) => handleFilterChange('stage', event.target.value)}
-                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition hover:border-primary/30"
-                  >
-                    <option value="all">All stages</option>
-                    {stageOrder.map((stage) => (
-                      <option key={stage} value={stage}>
-                        {stage}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={filters.priority}
-                    onChange={(event) => handleFilterChange('priority', event.target.value)}
-                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition hover:border-primary/30"
-                  >
-                    <option value="all">Any priority</option>
-                    <option value="High">High priority</option>
-                    <option value="Medium">Medium priority</option>
-                    <option value="Low">Low priority</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">Sort</span>
-                {[
-                  { key: 'newest', label: 'Newest' },
-                  { key: 'best', label: 'Best match' },
-                ].map((option) => (
-                  <button
-                    key={option.key}
-                    type="button"
-                    onClick={() => setSortBy(option.key as typeof sortBy)}
-                    className={cn(
-                      'rounded-full px-3 py-1.5 text-xs font-medium transition',
-                      sortBy === option.key
-                        ? 'bg-primary text-primary-foreground shadow-soft-lg'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {isLoadingMatches ? <JobMatchSkeleton count={3} /> : null}
-
-              {isErrorMatches ? (
-                <Card className="p-6 text-sm text-muted-foreground">
-                  Unable to load matches from Supabase. Check your credentials and try again.
-                </Card>
-              ) : null}
-
-              {!isLoadingMatches && !isErrorMatches && filteredJobs.length === 0 ? (
-                <Card className="p-6 text-sm text-muted-foreground">
-                  No roles match those filters. Adjust filters or add an opportunity manually.
-                </Card>
-              ) : null}
-
-              {!isLoadingMatches && !isErrorMatches
-                ? filteredJobs.map((job) => (
-                    <JobMatchCard
-                      key={job.id}
-                      job={job}
-                      isSelected={selectedJob?.id === job.id}
-                      onSelect={() => setSelectedJobId(job.id)}
-                    />
-                  ))
-                : null}
-
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-foreground">Track a manual opportunity</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Stay organized by logging new roles from referrals or niche communities.
-                </p>
-                <form className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={handleAddJob}>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Company</label>
-                    <input
-                      required
-                      value={newJob.company}
-                      onChange={(event) => handleNewJobFieldChange('company', event.target.value)}
-                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
-                      placeholder="Acme Robotics"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Role</label>
-                    <input
-                      required
-                      value={newJob.role}
-                      onChange={(event) => handleNewJobFieldChange('role', event.target.value)}
-                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
-                      placeholder="Senior Product Manager"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Location</label>
-                    <input
-                      required
-                      value={newJob.location}
-                      onChange={(event) => handleNewJobFieldChange('location', event.target.value)}
-                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
-                      placeholder="Remote, NYC..."
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Link</label>
-                    <input
-                      value={newJob.link}
-                      onChange={(event) => handleNewJobFieldChange('link', event.target.value)}
-                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
-                      placeholder="https://"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Priority</label>
-                    <select
-                      value={newJob.priority}
-                      onChange={(event) => handleNewJobFieldChange('priority', event.target.value)}
-                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
-                    >
-                      <option value="High">High</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">Tags</label>
-                    <input
-                      value={newJob.tags}
-                      onChange={(event) => handleNewJobFieldChange('tags', event.target.value)}
-                      className="rounded-xl border border-border bg-surface px-3 py-2 text-sm focus:border-primary/40"
-                      placeholder="AI, Seed Stage"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-soft-lg transition hover:bg-primary/90"
-                    >
-                      <Sparkles className="h-4 w-4" /> Add opportunity
-                    </button>
-                  </div>
-                </form>
-              </Card>
-            </div>
-          </section>
-
-          <aside className="space-y-6">
-            <PipelineMetrics
-              activeLeads={pipelineMetrics.activeLeads}
-              totalLeads={jobs.length}
-              automationAverage={pipelineMetrics.automationAverage}
-              upcomingFollowUps={pipelineMetrics.upcomingFollowUps}
-              momentumScore={Math.min(100, pipelineMetrics.activeLeads * 12 + pipelineMetrics.upcomingFollowUps * 4)}
-            />
-
-            {isLoadingMatches && !selectedJob ? (
-              <JobDetailSkeleton />
-            ) : selectedJob ? (
-              <JobDetailPanel
-                job={selectedJob}
-                tasks={jobTasks}
+              <PipelineView
+                selectedJob={selectedJob}
+                jobTasks={jobTasks}
+                nextFollowUps={nextFollowUps}
+                pipelineMetrics={pipelineMetrics}
+                automationIdeas={automationIdeas}
+                outreachTemplates={outreachTemplates}
+                jobs={jobs}
+                isLoadingMatches={isLoadingMatches}
                 onStageChange={handleStageChange}
                 onScheduleFollowUp={handleScheduleFollowUp}
                 onTaskStatusChange={handleTaskStatus}
               />
-            ) : (
-              <Card className="p-6 text-center text-sm text-muted-foreground">
-                Select a role from the list to preview automation insights.
-              </Card>
-            )}
-
-            <NextAutomations tasks={nextFollowUps} />
-            <AutomationPlaybooks ideas={automationIdeas} />
-            <StageAnalytics stageCounts={pipelineMetrics.stageCounts} />
-            <OutreachTemplates templates={outreachTemplates} />
-          </aside>
-        </div>
+            </div>
           </main>
         </div>
       </div>

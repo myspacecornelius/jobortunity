@@ -6,6 +6,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
+  SUPABASE_AUTOMATION_USER_ID: z.string().uuid(),
 });
 
 const env = envSchema.safeParse(process.env);
@@ -48,6 +49,7 @@ async function upsertPosting(sourceId: string, job: GreenhouseJob) {
       {
         source_id: sourceId,
         external_id: job.id.toString(),
+        owner_id: env.data.SUPABASE_AUTOMATION_USER_ID,
         company: 'Greenhouse Company',
         role: job.title,
         location: job.location?.name ?? 'Remote',
@@ -72,24 +74,30 @@ async function ensureMatchForPosting(postingId: string) {
     .from('job_matches')
     .select('id')
     .eq('posting_id', postingId)
+    .eq('user_id', env.data.SUPABASE_AUTOMATION_USER_ID)
     .maybeSingle();
 
   if (data) return;
 
-  const { error } = await supabase.from('job_matches').insert({ posting_id: postingId });
+  const { error } = await supabase
+    .from('job_matches')
+    .insert({ posting_id: postingId, user_id: env.data.SUPABASE_AUTOMATION_USER_ID });
   if (error) throw error;
 }
 
-async function ingestGreenhouseBoard(boardToken: string) {
+export async function ingestGreenhouseBoard(boardToken: string, limit?: number) {
   const sourceId = await upsertSource(`Greenhouse:${boardToken}`, `https://boards.greenhouse.io/${boardToken}`);
 
   const response = await axios.get(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs`);
   const jobs = z.object({ jobs: z.array(jobSchema) }).parse(response.data).jobs;
+  const jobsToProcess = typeof limit === 'number' ? jobs.slice(0, limit) : jobs;
 
-  for (const job of jobs) {
+  for (const job of jobsToProcess) {
     const postingId = await upsertPosting(sourceId, job);
     await ensureMatchForPosting(postingId);
   }
+
+  return { total: jobs.length, processed: jobsToProcess.length };
 }
 
 async function main() {
@@ -99,8 +107,8 @@ async function main() {
     process.exit(1);
   }
 
-  await ingestGreenhouseBoard(boardToken);
-  console.log('[ingest] Completed for', boardToken);
+  const result = await ingestGreenhouseBoard(boardToken);
+  console.log('[ingest] Completed for', boardToken, result);
 }
 
 main().catch((error) => {

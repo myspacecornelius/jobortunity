@@ -6,38 +6,124 @@
 
 @layer base {
   :root {
-    --background: 36 34% 96%;
-    --surface: 36 28% 98%;
-    --card: 0 0% 100%;
-    --border: 33 24% 85%;
-    --input: 36 20% 92%;
-    --ring: 245 72% 65%;
-    --foreground: 220 18% 20%;
-    --muted: 210 20% 94%;
-    --muted-foreground: 215 14% 45%;
-    --primary: 245 72% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 26 64% 54%;
-    --secondary-foreground: 30 100% 97%;
-    --accent: 210 60% 92%;
-    --accent-foreground: 217 32% 40%;
-    --pop: 162 50% 45%;
-    --pop-foreground: 154 90% 96%;
-    --positive: 146 40% 43%;
-    --positive-foreground: 144 55% 96%;
+    /* Massive-inspired Dark Palette */
+    --background: 220 25% 8%;          /* Deep charcoal navy */
+    --surface: 220 20% 11%;            /* Slightly lighter charcoal */
+    --card: 220 15% 14%;               /* Card background */
+    
+    /* Glassmorphism Elements */
+    --glass: 220 10% 18%;              /* Glass panel background */
+    --glass-border: 220 15% 25%;       /* Glass border */
+    --border: 220 15% 22%;             /* Default border */
+    --input: 220 20% 16%;              /* Input background */
+    --ring: 218 100% 65%;              /* Cobalt focus ring */
+    
+    /* Text Colors */
+    --foreground: 220 15% 92%;         /* High contrast white */
+    --muted: 220 10% 20%;              /* Muted background */
+    --muted-foreground: 220 8% 55%;    /* Muted text */
+    
+    /* Primary - Cobalt/Indigo */
+    --primary: 218 100% 65%;           /* Bright cobalt */
+    --primary-foreground: 220 20% 98%; /* Near white */
+    
+    /* Secondary - Warm accent */
+    --secondary: 35 85% 60%;           /* Warm orange accent */
+    --secondary-foreground: 220 20% 10%; /* Dark text */
+    
+    /* Accent - Cool blue */
+    --accent: 212 100% 72%;            /* Bright blue */
+    --accent-foreground: 220 20% 10%;  /* Dark text */
+    
+    /* Status colors */
+    --positive: 142 76% 55%;           /* Success green */
+    --positive-foreground: 220 20% 98%; /* Light text */
+    
+    --warning: 45 93% 58%;             /* Warning yellow */
+    --warning-foreground: 220 20% 10%; /* Dark text */
+    
+    --destructive: 0 84% 60%;          /* Error red */
+    --destructive-foreground: 220 20% 98%; /* Light text */
   }
 
   * {
     @apply border-border outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus-visible:ring-offset-background;
+    transition: all 0.2s cubic-bezier(0.21, 1, 0.27, 1);
   }
 
   body {
     @apply min-h-screen bg-background font-sans text-foreground antialiased;
-    background-image: linear-gradient(180deg, hsla(36, 40%, 96%, 1) 0%, hsla(36, 34%, 96%, 0.92) 38%, hsla(210, 45%, 96%, 0.9) 100%);
     margin: 0;
+    font-size: 15px;
+    background-image: 
+      radial-gradient(circle at 25% 25%, hsla(218, 100%, 65%, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, hsla(220, 15%, 25%, 0.3) 0%, transparent 50%);
   }
 
   a {
-    @apply text-primary underline-offset-4 transition-colors hover:text-primary/80;
+    @apply text-primary underline-offset-4 transition-all duration-300 hover:text-primary/80 hover:underline;
   }
 }
+
+@layer components {
+  /* Glassmorphism components */
+  .glass-panel {
+    @apply bg-glass/80 backdrop-blur-md border border-glass-border/60;
+  }
+  
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-lg;
+  }
+  
+  /* CRM table styling */
+  .crm-table {
+    @apply w-full border-separate border-spacing-0;
+  }
+  
+  .crm-table th {
+    @apply bg-glass/50 border-b border-glass-border/60 px-4 py-3 text-left;
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+    @apply sticky top-0 backdrop-blur-md z-10;
+  }
+  
+  .crm-table td {
+    @apply border-b border-border/30 px-4 py-3 transition-colors;
+  }
+  
+  .crm-table tr:hover td {
+    @apply bg-glass/30;
+  }
+  
+  /* Typography utilities */
+  .text-micro {
+    @apply text-xs uppercase tracking-wider font-semibold;
+  }
+  
+  /* Status pills */
+  .status-pill {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-pill.high {
+    @apply bg-destructive/10 text-destructive border border-destructive/20;
+  }
+  
+  .status-pill.medium {
+    @apply bg-warning/10 text-warning border border-warning/20;
+  }
+  
+  .status-pill.low {
+    @apply bg-muted/50 text-muted-foreground border border-border;
+  }
+  
+  /* Motion utilities */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .hover-lift:hover {
+    @apply -translate-y-0.5;
+  }
+}
+
+

@@ -48,6 +48,9 @@ export interface JobFilters {
   search: string;
   stage: string;
   priority: string;
+  company?: string;
+  location?: string;
+  minScore?: string;
 }
 
 export interface NewJobFormState {

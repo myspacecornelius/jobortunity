@@ -11,6 +11,8 @@ module.exports = {
         background: 'hsl(var(--background) / <alpha-value>)',
         surface: 'hsl(var(--surface) / <alpha-value>)',
         card: 'hsl(var(--card) / <alpha-value>)',
+        glass: 'hsl(var(--glass) / <alpha-value>)',
+        'glass-border': 'hsl(var(--glass-border) / <alpha-value>)',
         border: 'hsl(var(--border) / <alpha-value>)',
         input: 'hsl(var(--input) / <alpha-value>)',
         ring: 'hsl(var(--ring) / <alpha-value>)',
@@ -30,13 +32,17 @@ module.exports = {
           DEFAULT: 'hsl(var(--muted) / <alpha-value>)',
           foreground: 'hsl(var(--muted-foreground) / <alpha-value>)',
         },
-        pop: {
-          DEFAULT: 'hsl(var(--pop) / <alpha-value>)',
-          foreground: 'hsl(var(--pop-foreground) / <alpha-value>)',
-        },
         positive: {
           DEFAULT: 'hsl(var(--positive) / <alpha-value>)',
           foreground: 'hsl(var(--positive-foreground) / <alpha-value>)',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning) / <alpha-value>)',
+          foreground: 'hsl(var(--warning-foreground) / <alpha-value>)',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)',
         },
         foreground: 'hsl(var(--foreground) / <alpha-value>)',
       },

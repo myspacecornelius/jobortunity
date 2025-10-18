@@ -84,6 +84,7 @@ export const useJobMatches = () =>
       if (error) throw error;
       return jobMatchesSchema.parse(data ?? []);
     },
+    enabled: Boolean(supabase),
   });
 
 export const useAddJobMatch = () =>
@@ -100,9 +101,20 @@ export const useAddJobMatch = () =>
         throw new Error('Supabase client not initialised');
       }
 
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+      if (!user) {
+        throw new Error('You must be signed in to add a job');
+      }
+
       const { data: posting, error: postingError } = await supabase
         .from('job_postings')
         .insert({
+          owner_id: user.id,
           company: payload.company,
           role: payload.role,
           location: payload.location,
@@ -116,6 +128,7 @@ export const useAddJobMatch = () =>
 
       const { error: matchError } = await supabase.from('job_matches').insert({
         posting_id: posting.id,
+        user_id: user.id,
         priority: payload.priority,
         tags: payload.tags,
         notes: ['Added manually'],

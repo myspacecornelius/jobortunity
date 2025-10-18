@@ -5,6 +5,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
+  SUPABASE_DEMO_USER_ID: z.string().uuid(),
 });
 
 const env = envSchema.safeParse(process.env);
@@ -119,6 +120,7 @@ async function seed() {
     const { data: posting, error: postingError } = await supabase
       .from('job_postings')
       .insert({
+        owner_id: env.data.SUPABASE_DEMO_USER_ID,
         company: job.company,
         role: job.role,
         location: job.location,
@@ -142,6 +144,7 @@ async function seed() {
         .from('job_matches')
         .insert({
           posting_id: posting.id,
+          user_id: env.data.SUPABASE_DEMO_USER_ID,
           status: match.status,
           priority: match.priority,
           fit_score: match.fit_score,
