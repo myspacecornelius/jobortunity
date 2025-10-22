@@ -102,18 +102,19 @@ const JobTable: React.FC<JobTableProps> = ({ jobs, selectedJob, onSelectJob }) =
         <table className="crm-table min-w-full" style={{ minWidth: '800px' }}>
           <thead>
             <tr>
-              <th className="min-w-0" style={{ width: '40%' }}>
+              <th className="min-w-0" style={{ width: '35%' }}>
                 <SortButton field="role">Opportunity</SortButton>
               </th>
-              <th className="text-center" style={{ width: '15%' }}>
+              <th className="text-center" style={{ width: '12%' }}>
                 <SortButton field="score">Match</SortButton>
               </th>
-              <th style={{ width: '15%' }}>
+              <th style={{ width: '12%' }}>
                 <SortButton field="priority">Priority</SortButton>
               </th>
-              <th style={{ width: '20%' }}>
+              <th style={{ width: '15%' }}>
                 <SortButton field="lastTouchpoint">Last Touch</SortButton>
               </th>
+              <th style={{ width: '16%' }}>Next Action</th>
               <th className="text-center" style={{ width: '10%' }}>Actions</th>
             </tr>
           </thead>
@@ -125,7 +126,7 @@ const JobTable: React.FC<JobTableProps> = ({ jobs, selectedJob, onSelectJob }) =
                   key={job.id}
                   className={cn(
                     "cursor-pointer hover-lift group",
-                    selectedJob?.id === job.id && "bg-primary/5 border-l-2 border-l-primary"
+                    selectedJob?.id === job.id && "selected"
                   )}
                   onClick={() => onSelectJob(job.id)}
                 >
@@ -191,7 +192,7 @@ const JobTable: React.FC<JobTableProps> = ({ jobs, selectedJob, onSelectJob }) =
                       "status-pill",
                       normalizedPriority
                     )}>
-                      {job.priority}
+                      {normalizedPriority.charAt(0).toUpperCase() + normalizedPriority.slice(1)}
                     </span>
                   </td>
 
@@ -205,6 +206,28 @@ const JobTable: React.FC<JobTableProps> = ({ jobs, selectedJob, onSelectJob }) =
                         Follow-up due {formatDistanceToNow(new Date(job.followUpDate))}
                       </div>
                     )}
+                  </td>
+
+                  {/* Next Action */}
+                  <td>
+                    <div className="flex items-center gap-2">
+                      {job.followUpDate ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-accent"></div>
+                          <span className="text-sm font-medium text-foreground">Follow up</span>
+                        </div>
+                      ) : job.automationScore >= 80 ? (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-positive"></div>
+                          <span className="text-sm font-medium text-foreground">Apply</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-warning"></div>
+                          <span className="text-sm font-medium text-foreground">Research</span>
+                        </div>
+                      )}
+                    </div>
                   </td>
 
                   {/* Inline Actions */}

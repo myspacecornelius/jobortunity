@@ -181,6 +181,7 @@ const JobSearchAutomation: React.FC = () => {
   const [filters, setFilters] = useState<JobFilters>({ search: '', stage: 'all', priority: 'all' });
   const [sortBy, setSortBy] = useState<'newest' | 'best'>('newest');
   const [activeTab, setActiveTab] = useState<'matches' | 'applying' | 'applied'>('matches');
+  const [activePage, setActivePage] = useState<string>('Matches');
   const [newJob, setNewJob] = useState<NewJobFormState>({
     company: '',
     role: '',
@@ -524,11 +525,69 @@ const JobSearchAutomation: React.FC = () => {
     }
   }
 
+  const renderPageContent = () => {
+    switch (activePage) {
+      case 'Dashboard':
+        return (
+          <div className="p-6 text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Dashboard</h2>
+            <p className="text-muted-foreground">Dashboard content coming soon...</p>
+          </div>
+        );
+      case 'Matches':
+        return (
+          <JobMatchesView
+            filteredJobs={filteredJobs}
+            selectedJob={selectedJob}
+            sortBy={sortBy}
+            filters={filters}
+            isLoadingMatches={isLoadingMatches}
+            isErrorMatches={isErrorMatches}
+            onSelectJob={setSelectedJobId}
+            onFilterChange={handleFilterChange}
+            onSortChange={setSortBy}
+            onGenerateWeeklyPlan={handleGenerateWeeklyPlan}
+            onScheduleFollowUp={handleScheduleFollowUp}
+          />
+        );
+      case 'Sequences':
+        return (
+          <div className="p-6 text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Automation Sequences</h2>
+            <p className="text-muted-foreground">Outreach sequences and automation workflows coming soon...</p>
+          </div>
+        );
+      case 'Tasks':
+        return (
+          <div className="p-6 text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Tasks</h2>
+            <p className="text-muted-foreground">Task management coming soon...</p>
+          </div>
+        );
+      case 'Insights':
+        return (
+          <div className="p-6 text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Insights</h2>
+            <p className="text-muted-foreground">Analytics and insights coming soon...</p>
+          </div>
+        );
+      case 'Settings':
+        return (
+          <div className="p-6 text-center">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Settings</h2>
+            <p className="text-muted-foreground">Application settings coming soon...</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
         <aside className="sticky top-0 hidden h-screen w-64 lg:block">
-          <SidebarNavigation activeLabel="Matches" />
+          <SidebarNavigation activeLabel={activePage} onNavigate={setActivePage} />
         </aside>
 
         <div className="flex flex-1 flex-col">
@@ -558,33 +617,25 @@ const JobSearchAutomation: React.FC = () => {
                   onSubmitNewJob={handleAddJob}
                 />
               </div>
-              <JobMatchesView
-                filteredJobs={filteredJobs}
-                selectedJob={selectedJob}
-                sortBy={sortBy}
-                filters={filters}
-                isLoadingMatches={isLoadingMatches}
-                isErrorMatches={isErrorMatches}
-                onSelectJob={setSelectedJobId}
-                onFilterChange={handleFilterChange}
-                onSortChange={setSortBy}
-                onGenerateWeeklyPlan={handleGenerateWeeklyPlan}
-                onScheduleFollowUp={handleScheduleFollowUp}
-              />
+              <div className="flex-1">
+                {renderPageContent()}
+              </div>
 
-              <PipelineView
-                selectedJob={selectedJob}
-                jobTasks={jobTasks}
-                nextFollowUps={nextFollowUps}
-                pipelineMetrics={pipelineMetrics}
-                automationIdeas={automationIdeas}
-                outreachTemplates={outreachTemplates}
-                jobs={jobs}
-                isLoadingMatches={isLoadingMatches}
-                onStageChange={handleStageChange}
-                onScheduleFollowUp={handleScheduleFollowUp}
-                onTaskStatusChange={handleTaskStatus}
-              />
+              {activePage === 'Matches' && (
+                <PipelineView
+                  selectedJob={selectedJob}
+                  jobTasks={jobTasks}
+                  nextFollowUps={nextFollowUps}
+                  pipelineMetrics={pipelineMetrics}
+                  automationIdeas={automationIdeas}
+                  outreachTemplates={outreachTemplates}
+                  jobs={jobs}
+                  isLoadingMatches={isLoadingMatches}
+                  onStageChange={handleStageChange}
+                  onScheduleFollowUp={handleScheduleFollowUp}
+                  onTaskStatusChange={handleTaskStatus}
+                />
+              )}
             </div>
           </main>
         </div>
@@ -607,7 +658,7 @@ const JobSearchAutomation: React.FC = () => {
               </button>
             </div>
             <div className="max-h-[60vh] overflow-y-auto">
-              <SidebarNavigation activeLabel="Matches" />
+              <SidebarNavigation activeLabel={activePage} onNavigate={setActivePage} />
             </div>
           </div>
         </div>

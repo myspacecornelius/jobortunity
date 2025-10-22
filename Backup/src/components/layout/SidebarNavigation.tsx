@@ -14,6 +14,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   href?: string;
+  onClick?: () => void;
 }
 
 const navItems: NavItem[] = [
@@ -27,9 +28,10 @@ const navItems: NavItem[] = [
 
 interface SidebarNavigationProps {
   activeLabel?: string;
+  onNavigate?: (label: string) => void;
 }
 
-const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ activeLabel = 'Matches' }) => {
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ activeLabel = 'Matches', onNavigate }) => {
   return (
     <nav className="flex h-full flex-col justify-between border-r border-border/60 bg-background/95 px-4 py-6 backdrop-blur lg:px-6">
       <ul className="space-y-2">
@@ -39,14 +41,14 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ activeLabel = 'Ma
           return (
             <Fragment key={item.label}>
               <li>
-                <a
+                <button
                   className={cn(
-                    'flex items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium transition',
+                    'flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-sm font-medium transition',
                     active
                       ? 'bg-primary text-primary-foreground shadow-soft-lg'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
-                  href={item.href ?? '#'}
+                  onClick={() => onNavigate?.(item.label)}
                 >
                   <Icon className="h-4 w-4" />
                   <span>{item.label}</span>
@@ -55,7 +57,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ activeLabel = 'Ma
                       {item.badge}
                     </span>
                   ) : null}
-                </a>
+                </button>
               </li>
             </Fragment>
           );

@@ -52,7 +52,7 @@ const PipelineView: React.FC<PipelineViewProps> = ({
   onTaskStatusChange,
 }) => {
   return (
-    <aside className="space-y-6">
+    <aside className="space-y-4">
       <PipelineMetrics
         activeLeads={pipelineMetrics.activeLeads}
         totalLeads={jobs.length}
@@ -72,9 +72,12 @@ const PipelineView: React.FC<PipelineViewProps> = ({
           onTaskStatusChange={onTaskStatusChange}
         />
       ) : (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
-          Select a role from the list to preview automation insights.
-        </Card>
+        <div className="glass-panel rounded-lg p-4 text-center">
+          <div className="text-micro text-muted-foreground mb-2">SELECTION</div>
+          <div className="text-sm text-muted-foreground">
+            Select a role from the pipeline to view automation insights
+          </div>
+        </div>
       )}
 
       <NextAutomations tasks={nextFollowUps} />

@@ -1,0 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Massive-inspired Deep Slate/Indigo Palette */
+    --background: 215 28% 6%;          /* Deep slate background */
+    --surface: 215 25% 9%;             /* Slightly lighter slate */
+    --card: 215 22% 12%;               /* Card background */
+    
+    /* Glassmorphism Elements */
+    --glass: 215 20% 15%;              /* Glass panel background */
+    --glass-border: 215 25% 22%;       /* Glass border */
+    --border: 215 20% 18%;             /* Default border */
+    --input: 215 25% 14%;              /* Input background */
+    --ring: 230 85% 68%;               /* Indigo focus ring */
+    
+    /* Text Colors */
+    --foreground: 215 15% 95%;         /* High contrast white */
+    --muted: 215 15% 18%;              /* Muted background */
+    --muted-foreground: 215 12% 58%;   /* Muted text */
+    
+    /* Primary - Deep Indigo */
+    --primary: 230 85% 68%;            /* Indigo primary */
+    --primary-foreground: 215 20% 98%; /* Near white */
+    
+    /* Secondary - Slate accent */
+    --secondary: 215 20% 65%;          /* Cool slate accent */
+    --secondary-foreground: 215 25% 12%; /* Dark text */
+    
+    /* Accent - Bright indigo */
+    --accent: 235 100% 75%;            /* Bright indigo */
+    --accent-foreground: 215 25% 12%;  /* Dark text */
+    
+    /* Status colors - refined for slate theme */
+    --positive: 158 64% 52%;           /* Emerald green */
+    --positive-foreground: 215 20% 98%; /* Light text */
+    
+    --warning: 48 96% 53%;             /* Amber yellow */
+    --warning-foreground: 215 25% 12%; /* Dark text */
+    
+    --destructive: 0 84% 60%;          /* Rose red */
+    --destructive-foreground: 215 20% 98%; /* Light text */
+  }
+
+  * {
+    @apply border-border outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus-visible:ring-offset-background;
+    transition: all 0.2s cubic-bezier(0.21, 1, 0.27, 1);
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    margin: 0;
+    font-size: 15px;
+    background-image: 
+      radial-gradient(circle at 25% 25%, hsla(218, 100%, 65%, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, hsla(220, 15%, 25%, 0.3) 0%, transparent 50%);
+  }
+
+  a {
+    @apply text-primary underline-offset-4 transition-all duration-300 hover:text-primary/80 hover:underline;
+  }
+}
+
+@layer components {
+  /* Glassmorphism components */
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg shadow-black/20;
+  }
+  
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-lg border border-white/10 rounded-lg shadow-md shadow-black/10;
+  }
+  
+  /* CRM table styling */
+  .crm-table {
+    @apply w-full border-separate border-spacing-0;
+  }
+  
+  .crm-table th {
+    @apply bg-glass/50 border-b border-glass-border/60 px-4 py-3 text-left;
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+    @apply sticky top-0 backdrop-blur-md z-10;
+  }
+  
+  .crm-table td {
+    @apply border-b border-border/30 px-4 py-3 transition-colors;
+  }
+  
+  .crm-table tr:hover td {
+    @apply bg-glass/30;
+    position: relative;
+  }
+  
+  .crm-table tr:hover td:first-child::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, hsl(var(--primary)) 0%, transparent 100%);
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  .crm-table tr.selected td {
+    @apply bg-primary/5 border-l-2 border-l-primary;
+  }
+  
+  @keyframes slideIn {
+    from {
+      transform: scaleX(0);
+      transform-origin: left;
+    }
+    to {
+      transform: scaleX(1);
+      transform-origin: left;
+    }
+  }
+  
+  /* Typography utilities */
+  .text-micro {
+    @apply text-xs uppercase tracking-wider font-semibold;
+  }
+  
+  /* Status pills */
+  .status-pill {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .status-pill.high {
+    @apply bg-destructive/10 text-destructive border border-destructive/20;
+  }
+  
+  .status-pill.medium {
+    @apply bg-warning/10 text-warning border border-warning/20;
+  }
+  
+  .status-pill.low {
+    @apply bg-muted/50 text-muted-foreground border border-border;
+  }
+  
+  /* Motion utilities */
+  .hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .hover-lift:hover {
+    @apply -translate-y-0.5;
+  }
+}
+
+

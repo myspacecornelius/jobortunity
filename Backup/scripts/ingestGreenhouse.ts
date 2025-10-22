@@ -1,22 +1,20 @@
 import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 import { z } from 'zod';
+import { getSupabaseServiceClient } from '../src/lib/supabaseService';
 
 const envSchema = z.object({
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   SUPABASE_AUTOMATION_USER_ID: z.string().uuid(),
 });
 
 const env = envSchema.safeParse(process.env);
 
 if (!env.success) {
-  console.error('[ingest] Missing Supabase environment variables', env.error.flatten().fieldErrors);
+  console.error('[ingest] Missing SUPABASE_AUTOMATION_USER_ID', env.error.flatten().fieldErrors);
   process.exit(1);
 }
 
-const supabase = createClient(env.data.SUPABASE_URL, env.data.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = getSupabaseServiceClient();
 
 const jobSchema = z.object({
   id: z.number(),
